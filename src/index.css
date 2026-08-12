@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply bg-bg text-secondary font-sans; }
+  * { -webkit-font-smoothing: antialiased; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary text-white font-semibold rounded-2xl min-h-touch
+           px-6 flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_rgba(255,107,44,0.55)]
+           hover:brightness-105 active:bg-primary-dark active:scale-[0.99] transition-all disabled:opacity-50 disabled:shadow-none;
+  }
+  .btn-secondary {
+    @apply bg-secondary text-white font-semibold rounded-2xl min-h-touch
+           px-6 flex items-center justify-center gap-2
+           hover:brightness-110 active:bg-secondary-light active:scale-[0.99] transition-all disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply text-secondary font-medium rounded-xl min-h-touch
+           px-4 flex items-center justify-center gap-2
+           active:bg-gray-100 transition-colors;
+  }
+  .btn-danger {
+    @apply bg-danger text-white font-semibold rounded-xl min-h-touch
+           px-6 flex items-center justify-center gap-2
+           active:opacity-80 transition-colors disabled:opacity-50;
+  }
+  .card { @apply bg-surface rounded-2xl shadow-card p-4; }
+  .input {
+    @apply w-full border border-gray-200 rounded-xl px-4 h-12
+           text-secondary placeholder-gray-400 bg-surface
+           focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+           transition-colors;
+  }
+  .label { @apply block text-sm font-medium text-secondary mb-1; }
+  .page  { @apply px-4 pt-4 pb-24 max-w-lg mx-auto md:max-w-5xl md:pb-10; }
+}

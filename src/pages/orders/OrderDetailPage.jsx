@@ -1,0 +1,183 @@
+import { useParams, useNavigate } from 'react-router-dom'
+import { MapPin, FileText, Ban, ChefHat } from 'lucide-react'
+import TopBar from '../../components/layout/TopBar'
+import Card from '../../components/ui/Card'
+import Badge from '../../components/ui/Badge'
+import Button from '../../components/ui/Button'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import DeliveryAssigner from '../../components/orders/DeliveryAssigner'
+import { useOrder, useCancelOrder, useUpdateOrderStatus } from '../../hooks/useOrders'
+import { formatCurrency, formatShortId, formatDateTime } from '../../utils/format'
+
+const PAYMENT_LABELS = {
+  pix: 'PIX', credit_card: 'Cartão de crédito (online)', debit_card: 'Cartão de débito (online)',
+  cash_on_delivery: 'Pagamento na entrega',
+}
+
+const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)' }
+
+export default function OrderDetailPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const { data: order, isLoading } = useOrder(id)
+  const cancelOrder = useCancelOrder()
+  const updateStatus = useUpdateOrderStatus()
+
+  if (isLoading) return <LoadingSpinner />
+  if (!order) return <p className="page text-center text-gray-400">Pedido não encontrado.</p>
+
+  const hasAddress = order.deliveryAddress?.street
+  const canCancel = !['finalizado', 'cancelado'].includes(order.status)
+  // "Iniciar preparo" é manual mesmo pra pedido pago online — o status só
+  // deve virar "preparo" quando a cozinha realmente começar, não assim que
+  // o pagamento for confirmado (senão o cliente vê uma informação errada
+  // sobre o andamento real do pedido).
+  const canStartPreparing = ['recebido', 'pago'].includes(order.status)
+
+  const handleCancel = () => {
+    if (window.confirm('Cancelar este pedido? Essa ação não pode ser desfeita.')) {
+      cancelOrder.mutate(order._id, { onSuccess: () => navigate('/orders') })
+    }
+  }
+
+  return (
+    <div>
+      <TopBar title={`Pedido #${formatShortId(order._id)}`} subtitle={formatDateTime(order.createdAt)} back />
+
+      <div className="page space-y-4">
+        {/*
+          Status é só informativo aqui — pra pedidos com pagamento online,
+          avança sozinho quando o Mercado Pago confirma. Daí em diante, quem
+          comanda é o card de Entrega logo abaixo (atribuir entregador já
+          avança pra "preparo"; e o progresso da entrega, incluindo
+          "finalizado", vem do próprio entregador via WhatsApp).
+        */}
+        <div className="flex items-center justify-between">
+          <Badge status={order.status} />
+          {canStartPreparing && (
+            <Button
+              variant="primary"
+              className="!min-h-0 !h-9 !px-4 text-sm"
+              loading={updateStatus.isPending}
+              onClick={() => updateStatus.mutate({ id: order._id, status: 'preparo' })}
+            >
+              <ChefHat size={15} />
+              Iniciar preparo
+            </Button>
+          )}
+        </div>
+
+        {/* Itens */}
+        <Card>
+          <h3 className="font-semibold text-sm mb-3">Itens</h3>
+          <div className="space-y-3">
+            {order.items.map((item, i) => (
+              <div key={i} className="text-sm">
+                <div className="flex justify-between">
+                  <span>{item.quantity}x {item.name}</span>
+                  <span className="font-medium">{formatCurrency(item.subtotal)}</span>
+                </div>
+                {item.chosenOpcionais?.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-0.5 pl-3">
+                    Opcionais: {item.chosenOpcionais.map((o) => o.name).join(', ')}
+                  </p>
+                )}
+                {item.chosenAdicionais?.length > 0 && (
+                  <div className="pl-3 mt-0.5">
+                    {item.chosenAdicionais.map((a, j) => (
+                      <p key={j} className="text-xs text-primary">
+                        + {a.quantity}x {a.name} ({formatCurrency(a.subtotal)})
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-gray-100 mt-3 pt-3 space-y-1">
+            <div className="flex justify-between text-sm text-gray-500">
+              <span>Subtotal</span><span>{formatCurrency(order.subtotal)}</span>
+            </div>
+            {order.deliveryFee > 0 && (
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Taxa de entrega</span><span>{formatCurrency(order.deliveryFee)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold">
+              <span>Total</span><span>{formatCurrency(order.total)}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Pagamento */}
+        <Card>
+          <h3 className="font-semibold text-sm mb-2">Pagamento</h3>
+          <p className="text-sm">{PAYMENT_LABELS[order.paymentMethod]}</p>
+          {order.deliveryPaymentMethod && (
+            <p className="text-sm text-gray-500 mt-1">{DELIVERY_PAYMENT_LABELS[order.deliveryPaymentMethod]}</p>
+          )}
+          {order.changeRequested && (
+            <div className="mt-2 bg-warning/10 rounded-xl p-3 text-sm">
+              <p>Troco para {formatCurrency(order.changeFor)}</p>
+              <p className="font-semibold">Levar troco de {formatCurrency(order.changeAmount)}</p>
+            </div>
+          )}
+        </Card>
+
+        {/* Cliente e endereço */}
+        {hasAddress && (
+          <Card>
+            <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <MapPin size={16} className="text-primary" />
+              Endereço de entrega
+            </h3>
+            <p className="text-sm">
+              {order.deliveryAddress.street}, {order.deliveryAddress.number}
+            </p>
+            <p className="text-sm text-gray-500">{order.deliveryAddress.neighborhood}</p>
+            {order.deliveryAddress.referencePoint && (
+              <p className="text-xs text-gray-400 mt-1">Ref: {order.deliveryAddress.referencePoint}</p>
+            )}
+          </Card>
+        )}
+
+        {/* Entrega — só aparece se houver endereço */}
+        {hasAddress && <DeliveryAssigner order={order} />}
+
+        {/* Observações */}
+        {order.notes && (
+          <Card>
+            <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <FileText size={16} className="text-primary" />
+              Observações
+            </h3>
+            <p className="text-sm text-gray-600">{order.notes}</p>
+          </Card>
+        )}
+
+        {/* Descartáveis */}
+        {typeof order.wantsDisposables === 'boolean' && (
+          <Card>
+            <p className="text-sm">
+              {order.wantsDisposables ? '🍴 Cliente quer talheres/descartáveis' : '🚫 Cliente não quer talheres/descartáveis'}
+            </p>
+          </Card>
+        )}
+
+        {/* Cancelar pedido */}
+        {canCancel && (
+          <Button
+            full
+            variant="ghost"
+            className="text-danger"
+            loading={cancelOrder.isPending}
+            onClick={handleCancel}
+          >
+            <Ban size={16} />
+            Cancelar pedido
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
