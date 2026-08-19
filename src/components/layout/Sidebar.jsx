@@ -9,8 +9,7 @@ const NAV_ITEMS = [
   { to: '/orders',    icon: ShoppingBag,     label: 'Pedidos'  },
   { to: '/products',  icon: UtensilsCrossed, label: 'Cardápio', hideForOperator: true },
   { to: '/whatsapp',  icon: MessageCircle,   label: 'WhatsApp', hideForOperator: true },
-  { to: '/settings',  icon: Settings,        label: 'Configurações' },
-  { to: 'handleLogout', icon: LogOut,       label: 'Sair' }, 
+  { to: '/settings',  icon: Settings,        label: 'Configurações' },   
   
 ]
 
@@ -51,6 +50,18 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <Card onClick={handleLogout}>
+        <div className="flex-1 space-y-1 px-3 py-2">
+        <LogOut size={19} strokeWidth={2} />
+          <span className={({ isActive }) =>
+              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                isActive ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-bg hover:text-secondary'
+              }`
+            }
+          >Sair
+          </span>
+        </Card>
+        </div>
     </aside>
   )
 }
