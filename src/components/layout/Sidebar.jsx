@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { to: '/products',  icon: UtensilsCrossed, label: 'Cardápio', hideForOperator: true },
   { to: '/whatsapp',  icon: MessageCircle,   label: 'WhatsApp', hideForOperator: true },
   { to: '/settings',  icon: Settings,        label: 'Configurações' },
-  { to: '/handleLogout', icon: LogOut,       label: 'Sair' }, 
+  { to: 'handleLogout', icon: LogOut,       label: 'Sair' }, 
   
 ]
 
