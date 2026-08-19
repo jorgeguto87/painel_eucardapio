@@ -3,7 +3,7 @@ import { LayoutDashboard, ShoppingBag, UtensilsCrossed, MessageCircle, Settings,
 import useAuthStore from '../../stores/authStore'
 import useRestaurantStore from '../../stores/restaurantStore'
 import handleLogout from '../../pages/settings/SettingsPage'
-import Card from '../../components/ui/Card'
+import Card from '../ui/Card'
 
 const NAV_ITEMS = [
   { to: '/',          icon: LayoutDashboard, label: 'Início'   },
