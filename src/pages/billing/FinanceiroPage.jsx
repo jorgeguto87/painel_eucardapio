@@ -114,7 +114,7 @@ export default function FinanceiroPage() {
 
   return (
     <div>
-      <TopBar title="Financeiro" subtitle="Sua assinatura e pagamentos" back />
+      <TopBar title="Assinatura Eu Cardápio" subtitle="Sua assinatura e pagamentos" back />
 
       <div className="page space-y-4">
         {isRestricted && (
