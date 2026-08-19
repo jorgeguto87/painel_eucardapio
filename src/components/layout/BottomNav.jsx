@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, ShoppingBag, UtensilsCrossed, MessageCircle, Settings, LogOut } from 'lucide-react'
 import useAuthStore from '../../stores/authStore'
 import handleLogout from '../../pages/settings/SettingsPage'
-import Card from '../../components/ui/Card'
+import Card from '../ui/Card'
 
 const NAV_ITEMS = [
   { to: '/',          icon: LayoutDashboard, label: 'Início'   },
