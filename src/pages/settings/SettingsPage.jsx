@@ -9,7 +9,7 @@ import SupportModal from '../../components/support/SupportModal'
 const ITEMS = [
   { to: '/settings/my-profile', icon: UserCircle,    label: 'Meu perfil' },
   { to: '/settings/team',       icon: Users,         label: 'Equipe',    adminOnly: true },
-  { to: '/financeiro',           icon: Wallet,        label: 'Financeiro', adminOnly: true },
+  { to: '/financeiro',           icon: Wallet,        label: 'Minha assinatura', adminOnly: true },
   { to: '/reports',             icon: BarChart3,     label: 'Relatórios de faturamento', adminOnly: true },
   { to: '/settings/profile',    icon: Store,         label: 'Dados do restaurante', adminOnly: true },
   { to: '/settings/bot',        icon: MessageSquare, label: 'Mensagens do bot', adminOnly: true },
