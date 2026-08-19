@@ -50,8 +50,9 @@ export default function Sidebar() {
             {label}
           </NavLink>
         ))}
-      </nav>
-      <Card onClick={handleLogout}>
+      </nav>      
+    </aside>
+    <Card onClick={handleLogout}>
         <div className="flex-1 space-y-1 px-3 py-2">
         <LogOut size={19} strokeWidth={2} />
           <span className={({ isActive }) =>
@@ -63,6 +64,5 @@ export default function Sidebar() {
           </span>
         </Card>
         </div>
-    </aside>
   )
 }
