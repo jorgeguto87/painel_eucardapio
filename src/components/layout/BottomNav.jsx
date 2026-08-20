@@ -27,6 +27,7 @@ const handleLogoutClick = async () => {
 
 
   return (
+    <>
     <nav className="fixed bottom-0 left-0 right-0 bg-surface shadow-nav z-40 safe-area-pb">
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {items.map(({ to, icon: Icon, label }) => (
@@ -56,5 +57,6 @@ const handleLogoutClick = async () => {
           Sair
         </button>
       </div>
+    </>
   )
 }
