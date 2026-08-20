@@ -50,7 +50,7 @@ export default function BottomNav() {
           onClick={handleLogoutClick}
           className="flex flex-col items-center gap-1 py-2 px-3 min-w-[56px] text-gray-600 transition-colors"
         >
-          <LogOut size={22} strokeWidth={1.8} />
+          <LogOut size={22} strokeWidth={1.8} color={'red'}/>
           <span className="text-[10px] font-medium leading-none">Sair</span>
         </button>
       </div>
