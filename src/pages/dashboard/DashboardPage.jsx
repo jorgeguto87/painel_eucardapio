@@ -64,7 +64,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-500 mt-0.5">
                   {isSuspended
                     ? 'WhatsApp desconectado e cardápio bloqueado. Toque para regularizar.'
-                    : 'Regularize o pagamento para evitar a suspensão do WhatsApp e do cardápio.'}
+                    : 'Regularize o pagamento para evitar a suspensão do WhatsApp e Cardápio Digital.'}
                 </p>
               </div>
             </div>
@@ -84,7 +84,7 @@ export default function DashboardPage() {
                   {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Falta${trialDaysLeft === 1 ? '' : 'm'} ${trialDaysLeft} dia${trialDaysLeft === 1 ? '' : 's'} para expirar sua avaliação`}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Ative sua assinatura Eu Cardápio para continuar com todas as funcionalidades.
+                  Toque para ativar sua assinatura Eu Cardápio e continuar com todas as funcionalidades.
                 </p>
               </div>
             </div>
