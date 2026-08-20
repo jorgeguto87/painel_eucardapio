@@ -113,7 +113,7 @@ export default function FinanceiroPage() {
   }
 function assinatura(){
 const str='';
-  if(subscription?.status === 'trial'){
+  if(subscription === subscription?.status === 'trial'){
   str='Avaliação Gratuita';
   }else{
   str='Plano Beta';
