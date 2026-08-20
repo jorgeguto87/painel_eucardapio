@@ -1,8 +1,7 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, ShoppingBag, UtensilsCrossed, MessageCircle, Settings, LogOut } from 'lucide-react'
 import useAuthStore from '../../stores/authStore'
 import useRestaurantStore from '../../stores/restaurantStore'
-import handleLogout from '../../pages/settings/SettingsPage'
 import Card from '../ui/Card'
 
 const NAV_ITEMS = [
@@ -24,6 +23,13 @@ export default function Sidebar() {
   const restaurant = useRestaurantStore((s) => s.restaurant)
   const isOperator = role === 'operator'
   const items = NAV_ITEMS.filter((item) => !(isOperator && item.hideForOperator))
+  const navigate = useNavigate()
+const logout = useAuthStore((s) => s.logout)
+
+const handleLogoutClick = async () => {
+  await logout()
+  navigate('/login')
+}
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-gray-100 bg-surface md:flex">
@@ -50,19 +56,14 @@ export default function Sidebar() {
             {label}
           </NavLink>
         ))}
-      </nav>      
+      </nav> 
+      <div className="px-3 py-3 border-t border-gray-100">
+        <button type="button" onClick={handleLogoutClick} className="flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-danger/10 hover:text-danger transition-colors">
+          <LogOut size={19} strokeWidth={2} />
+          Sair
+        </button>
+      </div>
     </aside>
-    <Card onClick={handleLogout}>
-        <div className="flex-1 space-y-1 px-3 py-2">
-        <LogOut size={19} strokeWidth={2} />
-          <span className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-bg hover:text-secondary'
-              }`
-            }
-          >Sair
-          </span>
-        </Card>
-        </div>
+    
   )
 }
