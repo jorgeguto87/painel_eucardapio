@@ -111,7 +111,7 @@ export default function FinanceiroPage() {
       if (newTab) newTab.close()
     }
   }
-function assinatura(){
+/*function assinatura(){
 const str='';
   if(subscription === subscription?.status === 'trial'){
   str='Avaliação Gratuita';
@@ -119,7 +119,7 @@ const str='';
   str='Plano Beta';
   }
   return str;
-}
+}*/
   return (
     <div>
       <TopBar title="Assinatura Eu Cardápio" subtitle="Sua assinatura e pagamentos" back />
@@ -143,7 +143,7 @@ const str='';
 
         <Card>
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-sm">{assinatura()}</h3>
+            <h3 className="font-semibold text-sm">`${subscription?.status === 'trial' ? 'Avaliação Gratuita' : 'Plano Beta'}`</h3>
             <Badge status={subscription?.status} />
           </div>
           {subscription?.currentPeriodEnd && (
