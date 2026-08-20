@@ -143,7 +143,7 @@ const str='';
 
         <Card>
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-sm">`${subscription?.status === 'trial' ? 'Avaliação Gratuita' : 'Plano Beta'}`</h3>
+            <h3 className="font-semibold text-sm">{subscription?.status === 'trial' ? 'Avaliação Gratuita' : 'Plano Beta'}</h3>
             <Badge status={subscription?.status} />
           </div>
           {subscription?.currentPeriodEnd && (
