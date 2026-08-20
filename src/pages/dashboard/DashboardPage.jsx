@@ -44,7 +44,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <TopBar title={restaurant?.name || 'Meu Chapa'} subtitle="Visão geral" />
+      <TopBar title={restaurant?.name || 'Eu Cardápio'} subtitle="Visão geral" />
 
       <div className="page space-y-4">
         <NoticeBanner />
@@ -81,10 +81,10 @@ export default function DashboardPage() {
               <AlertTriangle size={20} className="text-warning flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="font-medium text-sm text-warning">
-                  {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Faltam ${trialDaysLeft} dia${trialDaysLeft === 1 ? '' : 's'} para expirar sua avaliação`}
+                  {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Falta ${trialDaysLeft === 1 ? '' : 'm'} dia${trialDaysLeft === 1 ? '' : 's'} para expirar sua avaliação`}
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Ative seu plano no Financeiro para continuar com todas as funcionalidades.
+                  Ative sua assinatura Eu Cardápio para continuar com todas as funcionalidades.
                 </p>
               </div>
             </div>
