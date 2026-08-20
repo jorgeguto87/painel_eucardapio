@@ -1,8 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, ShoppingBag, UtensilsCrossed, MessageCircle, Settings, LogOut } from 'lucide-react'
 import useAuthStore from '../../stores/authStore'
-import handleLogout from '../../pages/settings/SettingsPage'
-import Card from '../ui/Card'
+
+
 
 const NAV_ITEMS = [
   { to: '/',          icon: LayoutDashboard, label: 'Início'   },
@@ -17,6 +17,14 @@ export default function BottomNav() {
   const role = useAuthStore((s) => s.user?.role)
   const isOperator = role === 'operator'
   const items = NAV_ITEMS.filter((item) => !(isOperator && item.hideForOperator))
+  const navigate = useNavigate()
+const logout = useAuthStore((s) => s.logout)
+
+const handleLogoutClick = async () => {
+  await logout()
+  navigate('/login')
+}
+
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-surface shadow-nav z-40 safe-area-pb">
@@ -42,17 +50,11 @@ export default function BottomNav() {
         ))}
       </div>
     </nav>
-    <Card onClick={handleLogout}>
-        <div className="flex-1 space-y-1 px-3 py-2">
-        <LogOut size={19} strokeWidth={2} />
-          <span className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-bg hover:text-secondary'
-              }`
-            }
-          >Sair
-          </span>
-        </Card>
-        </div>
+    <div className="px-3 py-3 border-t border-gray-100">
+        <button type="button" onClick={handleLogoutClick} className="flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-danger/10 hover:text-danger transition-colors">
+          <LogOut size={19} strokeWidth={2} />
+          Sair
+        </button>
+      </div>
   )
 }
