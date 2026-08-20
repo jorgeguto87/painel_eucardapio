@@ -146,7 +146,7 @@ export default function FinanceiroPage() {
           {isTrial && subscription?.trialEndsAt && (
             <>
               <p className="text-xs text-gray-400 mt-1">
-                {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Faltam ${trialDaysLeft} dia${trialDaysLeft === 1 ? '' : 's'} de avaliação`} — até {formatDate(subscription.trialEndsAt)}
+                {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Falta${trialDaysLeft === 1 ? '' : 'm'} ${trialDaysLeft} dia${trialDaysLeft === 1 ? '' : 's'} de avaliação`} — até {formatDate(subscription.trialEndsAt)}
               </p>
               <Button full className="mt-3" onClick={() => setShowSubscribeModal(true)}>
                 Assinar plano
