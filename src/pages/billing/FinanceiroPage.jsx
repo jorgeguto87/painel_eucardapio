@@ -205,7 +205,7 @@ const str='';
               <div className="flex gap-2">
                 <Button full loading={generatePix.isPending} onClick={handleShowPix}>
                   <QrCode size={16} />
-                  Pagar com Pix
+                  Pix
                 </Button>
                 <Button full variant="secondary" loading={generateCardCheckout.isPending} onClick={handleCardPayment}>
                   <CreditCard size={16} />
