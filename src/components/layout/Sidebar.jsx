@@ -59,7 +59,7 @@ const handleLogoutClick = async () => {
       </nav> 
       <div className="px-3 py-3 border-t border-gray-100">
         <button type="button" onClick={handleLogoutClick} className="flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-danger/10 hover:text-danger transition-colors">
-          <LogOut size={19} strokeWidth={2} />
+          <LogOut size={19} strokeWidth={2} color=red/>
           Sair
         </button>
       </div>
