@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null, // registro manual em main.jsx (verifica update ativamente) — evita registro duplicado
       includeAssets: ['icons/*.png'],
       manifest: {
         name: 'Meu Chapa',
