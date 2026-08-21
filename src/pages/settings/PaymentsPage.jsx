@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CreditCard, CheckCircle2, Wallet, Zap, Info } from 'lucide-react'
+import { CreditCard, CheckCircle2, Wallet, Zap, Info, Landmark } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import TopBar from '../../components/layout/TopBar'
@@ -42,9 +42,12 @@ const PROVIDERS = [
     help: 'Ao clicar em "Conectar", você será levado pro Mercado Pago pra autorizar o acesso com a sua conta. Se ainda não tem conta, crie uma gratuitamente em mercadopago.com.br antes de conectar.',
   },
   {
+    // Temporariamente fora de uso enquanto ajustamos alguns pontos da
+    // integração — volta a ficar disponível assim que resolvido, sem
+    // precisar remover nada do código.
     key: 'pagbank', name: 'PagBank', icon: CreditCard,
-    desc: 'Ex-PagSeguro — boa alternativa se você já usa a maquininha deles.',
-    help: 'Ao clicar em "Conectar", você será levado pro PagBank pra autorizar o acesso. Se ainda não tem conta, crie uma gratuitamente em pagbank.com.br antes de conectar.',
+    desc: 'Integração temporariamente indisponível — em breve.',
+    comingSoon: true,
   },
   {
     key: 'infinitepay', name: 'InfinitePay', icon: Zap,
@@ -60,6 +63,21 @@ const PROVIDERS = [
       'Depois disso, digite seu handle aqui (o texto que aparece com $ no seu perfil InfinitePay — pode digitar com ou sem o $, não faz diferença).',
     ].join('\n'),
   },
+  {
+    key: 'inter', name: 'Banco Inter', icon: Landmark,
+    desc: 'Integração ainda não disponível — em breve.',
+    comingSoon: true,
+  },
+  {
+    key: 'nubank', name: 'Nubank', icon: Landmark,
+    desc: 'Integração ainda não disponível — em breve.',
+    comingSoon: true,
+  },
+  {
+    key: 'c6', name: 'C6 Bank', icon: Landmark,
+    desc: 'Integração ainda não disponível — em breve.',
+    comingSoon: true,
+  },
 ]
 
 export default function PaymentsPage() {
@@ -70,6 +88,9 @@ export default function PaymentsPage() {
   const [infinitepayHandle, setInfinitepayHandle] = useState('')
   const [connectingInfinitePay, setConnectingInfinitePay] = useState(false)
   const [helpProvider, setHelpProvider] = useState(null)
+  const [selectedProvider, setSelectedProvider] = useState(null)
+  const [connectingProvider, setConnectingProvider] = useState(null)
+  const [savingInfinitePay, setSavingInfinitePay] = useState(false)
 
   useEffect(() => { if (config) setForm(config) }, [config])
 
@@ -78,8 +99,6 @@ export default function PaymentsPage() {
       toast.success('Conta de pagamento conectada com sucesso!')
     }
   }, [searchParams])
-
-  const [connectingProvider, setConnectingProvider] = useState(null)
 
   const handleConnect = async (provider) => {
     if (provider === 'infinitepay') {
@@ -95,8 +114,6 @@ export default function PaymentsPage() {
       setConnectingProvider(null)
     }
   }
-
-  const [savingInfinitePay, setSavingInfinitePay] = useState(false)
 
   const submitInfinitePay = async (e) => {
     e.preventDefault()
@@ -160,32 +177,63 @@ export default function PaymentsPage() {
               </div>
               <Button variant="danger" full onClick={handleDisconnect}>Desconectar</Button>
             </>
-          ) : (
-            <div className="space-y-2">
-              {PROVIDERS.map(({ key, name, icon: Icon, desc, help }) => (
-                <div key={key} className="border border-gray-200 rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <Icon size={16} className="text-primary" />
-                      <span className="font-medium text-sm">{name}</span>
-                    </div>
-                    <button type="button" onClick={() => setHelpProvider({ name, help })} className="p-1 rounded-full hover:bg-gray-100">
+          ) : selectedProvider ? (
+            // ── Passo 2: detalhes só do banco escolhido ──────────────────
+            <div>
+              <button
+                type="button"
+                onClick={() => { setSelectedProvider(null); setConnectingInfinitePay(false) }}
+                className="mb-3 text-xs font-medium text-gray-400 hover:text-secondary"
+              >
+                ← Escolher outro banco
+              </button>
+
+              <div className="border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <selectedProvider.icon size={18} className="text-primary" />
+                    <span className="font-semibold text-sm">{selectedProvider.name}</span>
+                  </div>
+                  {!selectedProvider.comingSoon && (
+                    <button type="button" onClick={() => setHelpProvider(selectedProvider)} className="p-1 rounded-full hover:bg-gray-100">
                       <Info size={15} className="text-gray-400" />
                     </button>
-                  </div>
-                  <p className="text-xs text-gray-400 mb-2">{desc}</p>
-
-                  {key === 'infinitepay' && connectingInfinitePay ? (
-                    <form onSubmit={submitInfinitePay} className="flex gap-2">
-                      <Input placeholder="$seuhandle" value={infinitepayHandle} onChange={(e) => setInfinitepayHandle(e.target.value)} required />
-                      <Button type="submit" className="flex-shrink-0" loading={savingInfinitePay}>Salvar</Button>
-                    </form>
-                  ) : (
-                    <Button full variant="secondary" loading={connectingProvider === key} onClick={() => handleConnect(key)}>
-                      Conectar {name}
-                    </Button>
                   )}
                 </div>
+                <p className="text-xs text-gray-400 mb-3">{selectedProvider.desc}</p>
+
+                {selectedProvider.comingSoon ? (
+                  <div className="text-center text-xs font-medium text-gray-400 py-2.5 rounded-xl bg-gray-100">
+                    Indisponível no momento — em breve
+                  </div>
+                ) : selectedProvider.key === 'infinitepay' && connectingInfinitePay ? (
+                  <form onSubmit={submitInfinitePay} className="flex gap-2">
+                    <Input placeholder="$seuhandle" value={infinitepayHandle} onChange={(e) => setInfinitepayHandle(e.target.value)} required />
+                    <Button type="submit" className="flex-shrink-0" loading={savingInfinitePay}>Salvar</Button>
+                  </form>
+                ) : (
+                  <Button full variant="secondary" loading={connectingProvider === selectedProvider.key} onClick={() => handleConnect(selectedProvider.key)}>
+                    Conectar {selectedProvider.name}
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            // ── Passo 1: seletor compacto — só ícone + nome, sem detalhe ──
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {PROVIDERS.map(({ key, name, icon: Icon, comingSoon, ...rest }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedProvider({ key, name, icon: Icon, comingSoon, ...rest })}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition-colors ${
+                    comingSoon ? 'border-gray-100 bg-bg' : 'border-gray-200 hover:border-primary/40 hover:bg-primary/5'
+                  }`}
+                >
+                  <Icon size={20} className={comingSoon ? 'text-gray-300' : 'text-primary'} />
+                  <span className={`text-xs font-medium ${comingSoon ? 'text-gray-400' : 'text-secondary'}`}>{name}</span>
+                  {comingSoon && <span className="text-[10px] text-gray-400">Em breve</span>}
+                </button>
               ))}
             </div>
           )}
