@@ -75,6 +75,9 @@ export default function OfertasPage() {
 // ─── Cupons — EXATAMENTE como já estava, nenhuma mudança de comportamento ──
 
 function CouponsTab() {
+  const { data: coupons, isLoading } = useCoupons()
+  const { data: products } = useProducts()
+  const { data: categories } = useProductCategories()
   const createCoupon = useCreateCoupon()
   const updateCoupon = useUpdateCoupon()
   const deleteCoupon = useDeleteCoupon()
@@ -335,6 +338,7 @@ function CouponsTab() {
 // ─── Cashback — layout limpo: botão + lista, config geral vira ícone separado
 
 function CashbackTab() {
+  const { data: rules, isLoading } = useCashbackRules()
   const { data: config, isLoading: configLoading } = useCashbackConfig()
   const { data: categories } = useProductCategories()
   const { data: products } = useProducts()
