@@ -1,15 +1,38 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ImageOff, SlidersHorizontal, Star, Image } from 'lucide-react'
+import { Plus, ImageOff, SlidersHorizontal, Star, Image, QrCode } from 'lucide-react'
+import toast from 'react-hot-toast'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useProducts, useToggleProduct } from '../../hooks/useProducts'
 import { formatCurrency } from '../../utils/format'
+import api from '../../config/api'
 
 export default function ProductsPage() {
   const navigate = useNavigate()
   const { data: grouped, isLoading } = useProducts()
   const toggleProduct = useToggleProduct()
+  const [downloadingSign, setDownloadingSign] = useState(false)
+
+  const downloadMesaSign = async () => {
+    setDownloadingSign(true)
+    try {
+      const response = await api.get('/restaurants/me/mesa-sign.pdf', { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'qrcode-mesa.pdf')
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error('Erro ao gerar o PDF. Tente novamente.')
+    } finally {
+      setDownloadingSign(false)
+    }
+  }
 
   return (
     <div>
@@ -49,6 +72,14 @@ export default function ProductsPage() {
             <Image size={14} /> Banners
           </button>
         </div>
+
+        <button
+          onClick={downloadMesaSign}
+          disabled={downloadingSign}
+          className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-3 rounded-xl border border-primary/30 text-primary hover:bg-primary/5 transition-colors mb-4 disabled:opacity-60"
+        >
+          <QrCode size={16} /> {downloadingSign ? 'Gerando PDF...' : 'Imprimir QR Code de mesa'}
+        </button>
 
         {isLoading ? (
           <LoadingSpinner />
