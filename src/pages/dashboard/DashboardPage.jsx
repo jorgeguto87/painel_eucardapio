@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingBag, DollarSign, Clock, MessageCircle, Bike, AlertTriangle } from 'lucide-react'
+import { ShoppingBag, DollarSign, Clock, MessageCircle, Bike, AlertTriangle, UtensilsCrossed } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -38,9 +38,12 @@ export default function DashboardPage() {
   const today = new Date().toDateString()
   const todayOrders = orders.filter((o) => new Date(o.createdAt).toDateString() === today)
   const openOrders = orders.filter((o) => !['finalizado', 'cancelado'].includes(o.status))
-  const todayRevenue = todayOrders
-    .filter((o) => o.status !== 'cancelado')
-    .reduce((sum, o) => sum + o.total, 0)
+
+  const todayDelivery = todayOrders.filter((o) => o.orderType !== 'mesa')
+  const todayMesa      = todayOrders.filter((o) => o.orderType === 'mesa')
+  const revenueOf = (list) => list.filter((o) => o.status !== 'cancelado').reduce((sum, o) => sum + o.total, 0)
+  const todayRevenueDelivery = revenueOf(todayDelivery)
+  const todayRevenueMesa      = revenueOf(todayMesa)
 
   return (
     <div>
@@ -107,22 +110,38 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* Métricas do dia */}
+        {/* Métricas do dia — divididas por canal, pra não misturar delivery com mesa */}
         <div className="grid grid-cols-2 gap-3">
           <Card>
             <div className="flex items-center gap-2 text-gray-400 mb-1">
               <ShoppingBag size={16} />
-              <span className="text-xs font-medium">Pedidos hoje</span>
+              <span className="text-xs font-medium">Pedidos hoje — Delivery</span>
             </div>
-            <p className="text-2xl font-bold text-secondary">{todayOrders.length}</p>
+            <p className="text-2xl font-bold text-secondary">{todayDelivery.length}</p>
+          </Card>
+
+          <Card>
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <UtensilsCrossed size={16} />
+              <span className="text-xs font-medium">Pedidos hoje — Mesa</span>
+            </div>
+            <p className="text-2xl font-bold text-secondary">{todayMesa.length}</p>
           </Card>
 
           <Card onClick={() => navigate('/reports')}>
             <div className="flex items-center gap-2 text-gray-400 mb-1">
               <DollarSign size={16} />
-              <span className="text-xs font-medium">Faturamento</span>
+              <span className="text-xs font-medium">Faturamento — Delivery</span>
             </div>
-            <p className="text-2xl font-bold text-secondary">{formatCurrency(todayRevenue)}</p>
+            <p className="text-2xl font-bold text-secondary">{formatCurrency(todayRevenueDelivery)}</p>
+          </Card>
+
+          <Card onClick={() => navigate('/reports')}>
+            <div className="flex items-center gap-2 text-gray-400 mb-1">
+              <DollarSign size={16} />
+              <span className="text-xs font-medium">Faturamento — Mesa</span>
+            </div>
+            <p className="text-2xl font-bold text-secondary">{formatCurrency(todayRevenueMesa)}</p>
           </Card>
         </div>
 
@@ -159,8 +178,13 @@ export default function DashboardPage() {
                     <div>
                       <p className="font-medium text-sm">
                         #{order._id.slice(-6).toUpperCase()}
+                        {order.orderType === 'mesa' && (
+                          <span className="ml-1.5 text-[10px] font-bold uppercase text-primary bg-primary/10 rounded-full px-1.5 py-0.5">Mesa</span>
+                        )}
                       </p>
-                      <p className="text-xs text-gray-400">{order.customerPhone}</p>
+                      <p className="text-xs text-gray-400">
+                        {order.orderType === 'mesa' ? `Mesa ${order.tableNumber}` : order.customerPhone}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-sm mb-1">{formatCurrency(order.total)}</p>
