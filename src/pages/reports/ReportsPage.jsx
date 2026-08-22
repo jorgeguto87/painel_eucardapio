@@ -116,8 +116,8 @@ function DetailGrid({ totals, deliverers, loadingDeliverers }) {
 
 // ─── Aba "Diário": lista dos últimos dias com receita, clicável ───────────
 
-function DailyTab({ onSelectDay }) {
-  const { data, isLoading } = useRevenueReport('daily')
+function DailyTab({ onSelectDay, orderType }) {
+  const { data, isLoading } = useRevenueReport('daily', orderType)
   const periods = data?.periods || []
 
   if (isLoading) return <LoadingSpinner />
@@ -140,13 +140,13 @@ function DailyTab({ onSelectDay }) {
 
 // ─── Aba "Mensal": drill-down Mês → Semana → Dia → Detalhe ────────────────
 
-function MonthlyTab({ onSelectDay }) {
+function MonthlyTab({ onSelectDay, orderType }) {
   const [month, setMonth] = useState(null)
   const [week, setWeek] = useState(null) // { label, from, to }
 
-  const { data: months, isLoading: loadingMonths } = useMonthsReport()
-  const { data: weeks, isLoading: loadingWeeks } = useWeeksOfMonth(month)
-  const { data: daysData, isLoading: loadingDays } = useDaysOfWeek(week?.from, week?.to)
+  const { data: months, isLoading: loadingMonths } = useMonthsReport(orderType)
+  const { data: weeks, isLoading: loadingWeeks } = useWeeksOfMonth(month, orderType)
+  const { data: daysData, isLoading: loadingDays } = useDaysOfWeek(week?.from, week?.to, orderType)
 
   // Nível 3: dias da semana selecionada
   if (week) {
@@ -226,8 +226,15 @@ function MonthlyTab({ onSelectDay }) {
 export default function ReportsPage() {
   const [tab, setTab] = useState('daily') // 'daily' | 'monthly'
   const [selectedDate, setSelectedDate] = useState(null) // dia em detalhe (AAAA-MM-DD)
+  const [orderType, setOrderType] = useState(undefined) // undefined = Todos | 'delivery' | 'mesa'
 
-  const { data: dayDetail, isLoading: loadingDayDetail } = useDayDetail(selectedDate)
+  const { data: dayDetail, isLoading: loadingDayDetail } = useDayDetail(selectedDate, orderType)
+
+  const CHANNEL_OPTIONS = [
+    { v: undefined,  l: 'Todos os canais' },
+    { v: 'delivery', l: 'Delivery' },
+    { v: 'mesa',     l: 'Mesa' },
+  ]
 
   // Tela de detalhe do dia (nível final, alcançável a partir de qualquer aba)
   if (selectedDate) {
@@ -257,6 +264,21 @@ export default function ReportsPage() {
       <TopBar title="Relatórios" subtitle="Faturamento do restaurante" back />
 
       <div className="page">
+        {/* Canal — puxa separado (só delivery ou só mesa) ou junto (Todos) */}
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-3 scrollbar-hide">
+          {CHANNEL_OPTIONS.map((c) => (
+            <button
+              key={c.l}
+              onClick={() => setOrderType(c.v)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                orderType === c.v ? 'border-secondary bg-secondary text-white' : 'border-gray-200 bg-surface text-gray-500'
+              }`}
+            >
+              {c.l}
+            </button>
+          ))}
+        </div>
+
         <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
           {[{ v: 'daily', l: 'Diário' }, { v: 'monthly', l: 'Mensal' }].map((t) => (
             <button
@@ -272,8 +294,8 @@ export default function ReportsPage() {
         </div>
 
         {tab === 'daily'
-          ? <DailyTab onSelectDay={setSelectedDate} />
-          : <MonthlyTab onSelectDay={setSelectedDate} />}
+          ? <DailyTab onSelectDay={setSelectedDate} orderType={orderType} />
+          : <MonthlyTab onSelectDay={setSelectedDate} orderType={orderType} />}
       </div>
     </div>
   )
