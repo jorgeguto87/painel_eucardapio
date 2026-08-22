@@ -23,6 +23,7 @@ import SettingsPage from './pages/settings/SettingsPage'
 import RestaurantProfilePage from './pages/settings/RestaurantProfilePage'
 import BotConfigPage from './pages/settings/BotConfigPage'
 import BannersPage from './pages/settings/BannersPage'
+import OfertasPage from './pages/settings/OfertasPage'
 import BusinessHoursPage from './pages/settings/BusinessHoursPage'
 import PaymentsPage from './pages/settings/PaymentsPage'
 import DeliverersPage from './pages/settings/DeliverersPage'
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/products/adicionais" element={<RequireAdmin><AdicionaisPage /></RequireAdmin>} />
             <Route path="/products/favoritos" element={<RequireAdmin><FavoritosPage /></RequireAdmin>} />
             <Route path="/products/banners" element={<RequireAdmin><BannersPage /></RequireAdmin>} />
+            <Route path="/settings/ofertas" element={<RequireAdmin><OfertasPage /></RequireAdmin>} />
             <Route path="/products/:id" element={<RequireAdmin><ProductFormPage /></RequireAdmin>} />
 
             <Route path="/whatsapp" element={<RequireAdmin><WhatsappPage /></RequireAdmin>} />
