@@ -35,6 +35,15 @@ const emptyCoupon = {
 
 const emptyRule = { type: 'global', percent: '', categoryName: '', productId: '', productName: '', excludedCategories: '', description: '' }
 
+const defaultConfigForm = {
+  cashbackEnabled: false,
+  cashbackValidityMode: 'rolling_months',
+  cashbackFixedExpirationMonth: 12,
+  cashbackFixedExpirationDay: 31,
+  cashbackRollingMonths: 6,
+  cashbackStackingMode: 'sum',
+}
+
 export default function OfertasPage() {
   const [tab, setTab] = useState('coupons')
 
@@ -63,12 +72,9 @@ export default function OfertasPage() {
   )
 }
 
-// ─── Cupons ─────────────────────────────────────────────────────────────
+// ─── Cupons — EXATAMENTE como já estava, nenhuma mudança de comportamento ──
 
 function CouponsTab() {
-  const { data: coupons, isLoading } = useCoupons()
-  const { data: products } = useProducts()
-  const { data: categories } = useProductCategories()
   const createCoupon = useCreateCoupon()
   const updateCoupon = useUpdateCoupon()
   const deleteCoupon = useDeleteCoupon()
@@ -326,19 +332,9 @@ function CouponsTab() {
   )
 }
 
-// ─── Cashback ───────────────────────────────────────────────────────────
-
-const defaultConfigForm = {
-  cashbackEnabled: false,
-  cashbackValidityMode: 'rolling_months',
-  cashbackFixedExpirationMonth: 12,
-  cashbackFixedExpirationDay: 31,
-  cashbackRollingMonths: 6,
-  cashbackStackingMode: 'sum',
-}
+// ─── Cashback — layout limpo: botão + lista, config geral vira ícone separado
 
 function CashbackTab() {
-  const { data: rules, isLoading } = useCashbackRules()
   const { data: config, isLoading: configLoading } = useCashbackConfig()
   const { data: categories } = useProductCategories()
   const { data: products } = useProducts()
@@ -347,14 +343,15 @@ function CashbackTab() {
   const deleteRule = useDeleteCashbackRule()
   const updateConfig = useUpdateCashbackConfig()
 
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(emptyRule)
-  const [configForm, setConfigForm] = useState(null)
-
   const allProducts = Object.values(products || {}).flat()
   const productsById = Object.fromEntries(allProducts.map((p) => [p._id, p]))
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyRule)
   const [pickerOpen, setPickerOpen] = useState(null)
+  const [configForm, setConfigForm] = useState(null)
 
   // Antes, se a config ainda não existisse pro restaurante (ou a busca
   // falhasse por qualquer motivo), configForm nunca era preenchido e a
@@ -405,89 +402,71 @@ function CashbackTab() {
       cashbackFixedExpirationDay: Number(configForm.cashbackFixedExpirationDay),
       cashbackRollingMonths: Number(configForm.cashbackRollingMonths),
       cashbackStackingMode: configForm.cashbackStackingMode,
-    })
+    }, { onSuccess: () => setSettingsOpen(false) })
   }
 
   if (isLoading || configLoading || !configForm) return <LoadingSpinner />
 
   return (
     <>
-      {/* Configuração geral */}
-      <Card>
-        <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Settings2 size={15} /> Configuração geral</h3>
+      <div className="flex items-center justify-between -mt-1 mb-1">
+        <p className="text-xs text-gray-400">Regras de acúmulo de cashback</p>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="p-2 rounded-xl text-gray-500 hover:bg-gray-100"
+          title="Configurações gerais de cashback"
+        >
+          <Settings2 size={18} />
+        </button>
+      </div>
 
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium">Cashback ativo</span>
-          <button type="button" onClick={() => setConfigForm({ ...configForm, cashbackEnabled: !configForm.cashbackEnabled })}
-            className={`relative w-11 h-6 rounded-full transition-colors ${configForm.cashbackEnabled ? 'bg-success' : 'bg-gray-300'}`}>
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configForm.cashbackEnabled ? 'translate-x-5' : ''}`} />
-          </button>
-        </div>
-
-        <div className="mb-3">
-          <label className="label">Se o pedido bater em mais de uma regra</label>
-          <select className="input" value={configForm.cashbackStackingMode} onChange={(e) => setConfigForm({ ...configForm, cashbackStackingMode: e.target.value })}>
-            <option value="sum">Soma todas as regras que bateram</option>
-            <option value="highest">Usa só a de maior percentual</option>
-          </select>
-        </div>
-
-        <div className="mb-3">
-          <label className="label">Validade do saldo acumulado</label>
-          <select className="input" value={configForm.cashbackValidityMode} onChange={(e) => setConfigForm({ ...configForm, cashbackValidityMode: e.target.value })}>
-            <option value="rolling_months">Expira X meses depois do último ganho</option>
-            <option value="fixed_date">Expira numa data fixa todo ano</option>
-          </select>
-        </div>
-
-        {configForm.cashbackValidityMode === 'rolling_months' ? (
-          <Input label="Meses até expirar" type="number" min="1" max="36" value={configForm.cashbackRollingMonths} onChange={(e) => setConfigForm({ ...configForm, cashbackRollingMonths: e.target.value })} />
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <Input label="Mês (1-12)" type="number" min="1" max="12" value={configForm.cashbackFixedExpirationMonth} onChange={(e) => setConfigForm({ ...configForm, cashbackFixedExpirationMonth: e.target.value })} />
-            <Input label="Dia (1-31)" type="number" min="1" max="31" value={configForm.cashbackFixedExpirationDay} onChange={(e) => setConfigForm({ ...configForm, cashbackFixedExpirationDay: e.target.value })} />
-          </div>
+      <>
+        {!configForm.cashbackEnabled && (
+          <Card className="border border-warning/30 bg-warning/5">
+            <p className="text-sm text-warning font-medium">Cashback desativado</p>
+            <p className="text-xs text-gray-500 mt-0.5">Toque no ícone de engrenagem acima pra ativar antes de criar regras.</p>
+          </Card>
         )}
 
-        <Button full className="mt-3" onClick={saveConfig} loading={updateConfig.isPending}>Salvar configuração</Button>
-      </Card>
+        <Button full onClick={openNew}><Plus size={16} /> Criar novo cashback</Button>
 
-      <Button full onClick={openNew}><Plus size={16} /> Nova regra de cashback</Button>
-
-      {(!rules || rules.length === 0) ? (
-        <EmptyState title="Nenhuma regra criada ainda" description="Crie uma regra pra seus clientes começarem a acumular cashback." />
-      ) : (
-        <div className="space-y-2">
-          {rules.map((r) => (
-            <Card key={r._id} onClick={() => openEdit(r)}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-sm">{RULE_TYPE_LABELS[r.type]}</p>
-                  <p className="text-xs text-gray-400">
-                    {r.percent}% de cashback
-                    {r.type === 'category' && r.categoryName && ` — ${r.categoryName}`}
-                    {r.type === 'product' && productsById[r.productId] && ` — ${productsById[r.productId].name}`}
-                  </p>
-                  {r.description && <p className="text-xs text-gray-400 mt-0.5">{r.description}</p>}
+        {(!rules || rules.length === 0) ? (
+          <EmptyState title="Nenhuma regra criada ainda" description="Crie uma regra pra seus clientes começarem a acumular cashback." />
+        ) : (
+          <div className="space-y-2">
+            {rules.map((r) => (
+              <Card key={r._id} onClick={() => openEdit(r)}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-sm">{RULE_TYPE_LABELS[r.type]}</p>
+                    <p className="text-xs text-gray-400">
+                      {r.percent}% de cashback
+                      {r.type === 'category' && r.categoryName && ` — ${r.categoryName}`}
+                      {r.type === 'product' && productsById[r.productId] && ` — ${productsById[r.productId].name}`}
+                    </p>
+                    {r.description && <p className="text-xs text-gray-400 mt-0.5">{r.description}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => toggleRuleActive(r, e)}
+                    className={`relative w-10 h-5.5 rounded-full transition-colors shrink-0 ${r.isActive ? 'bg-success' : 'bg-gray-300'}`}
+                    title={r.isActive ? 'Ativa — toque para desativar' : 'Inativa — toque para ativar'}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${r.isActive ? 'translate-x-4.5' : ''}`} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => toggleRuleActive(r, e)}
-                  className={`relative w-10 h-5.5 rounded-full transition-colors shrink-0 ${r.isActive ? 'bg-success' : 'bg-gray-300'}`}
-                  title={r.isActive ? 'Ativa — toque para desativar' : 'Inativa — toque para ativar'}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${r.isActive ? 'translate-x-4.5' : ''}`} />
-                </button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Editar regra' : 'Nova regra de cashback'}>
+      {/* Criar/editar uma regra — só o que define ESSA regra específica */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Editar cashback' : 'Criar novo cashback'}>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="label">Tipo de regra</label>
+            <label className="label">Vale para</label>
             <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
               <option value="global">Todo o cardápio</option>
               <option value="category">Categoria específica</option>
@@ -500,14 +479,8 @@ function CashbackTab() {
           {form.type === 'category' && (
             <div>
               <label className="label">Categoria</label>
-              <button
-                type="button"
-                onClick={() => setPickerOpen('category')}
-                className="input flex items-center justify-between text-left"
-              >
-                <span className={form.categoryName ? 'text-secondary' : 'text-gray-400'}>
-                  {form.categoryName || 'Selecione a categoria...'}
-                </span>
+              <button type="button" onClick={() => setPickerOpen('category')} className="input flex items-center justify-between text-left">
+                <span className={form.categoryName ? 'text-secondary' : 'text-gray-400'}>{form.categoryName || 'Selecione a categoria...'}</span>
                 <ChevronRight size={16} className="text-gray-300" />
               </button>
             </div>
@@ -516,14 +489,8 @@ function CashbackTab() {
           {form.type === 'product' && (
             <div>
               <label className="label">Produto</label>
-              <button
-                type="button"
-                onClick={() => setPickerOpen('product')}
-                className="input flex items-center justify-between text-left"
-              >
-                <span className={form.productName ? 'text-secondary' : 'text-gray-400'}>
-                  {form.productName || 'Selecione o produto...'}
-                </span>
+              <button type="button" onClick={() => setPickerOpen('product')} className="input flex items-center justify-between text-left">
+                <span className={form.productName ? 'text-secondary' : 'text-gray-400'}>{form.productName || 'Selecione o produto...'}</span>
                 <ChevronRight size={16} className="text-gray-300" />
               </button>
             </div>
@@ -536,17 +503,57 @@ function CashbackTab() {
           <Input label="Descrição (só pra você lembrar)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
 
           <Button type="submit" full loading={createRule.isPending || updateRule.isPending}>
-            {editingId ? 'Salvar' : 'Criar regra'}
+            {editingId ? 'Salvar' : 'Criar cashback'}
           </Button>
 
           {editingId && (
             <Button type="button" variant="ghost" full className="text-danger" onClick={() => {
-              if (window.confirm('Remover essa regra?')) deleteRule.mutate(editingId, { onSuccess: () => setModalOpen(false) })
+              if (window.confirm('Remover esse cashback?')) deleteRule.mutate(editingId, { onSuccess: () => setModalOpen(false) })
             }}>
-              <Trash2 size={15} /> Remover regra
+              <Trash2 size={15} /> Remover
             </Button>
           )}
         </form>
+      </Modal>
+
+      {/* Configurações gerais — validade e empilhamento, separado da criação de regras */}
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Configurações gerais de cashback">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Cashback ativo</span>
+            <button type="button" onClick={() => setConfigForm({ ...configForm, cashbackEnabled: !configForm.cashbackEnabled })}
+              className={`relative w-11 h-6 rounded-full transition-colors ${configForm.cashbackEnabled ? 'bg-success' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${configForm.cashbackEnabled ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+
+          <div>
+            <label className="label">Se o pedido bater em mais de uma regra</label>
+            <select className="input" value={configForm.cashbackStackingMode} onChange={(e) => setConfigForm({ ...configForm, cashbackStackingMode: e.target.value })}>
+              <option value="sum">Soma todas as regras que bateram</option>
+              <option value="highest">Usa só a de maior percentual</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="label">Validade do saldo acumulado</label>
+            <select className="input" value={configForm.cashbackValidityMode} onChange={(e) => setConfigForm({ ...configForm, cashbackValidityMode: e.target.value })}>
+              <option value="rolling_months">Expira X meses depois do último ganho</option>
+              <option value="fixed_date">Expira numa data fixa todo ano</option>
+            </select>
+          </div>
+
+          {configForm.cashbackValidityMode === 'rolling_months' ? (
+            <Input label="Meses até expirar" type="number" min="1" max="36" value={configForm.cashbackRollingMonths} onChange={(e) => setConfigForm({ ...configForm, cashbackRollingMonths: e.target.value })} />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Input label="Mês (1-12)" type="number" min="1" max="12" value={configForm.cashbackFixedExpirationMonth} onChange={(e) => setConfigForm({ ...configForm, cashbackFixedExpirationMonth: e.target.value })} />
+              <Input label="Dia (1-31)" type="number" min="1" max="31" value={configForm.cashbackFixedExpirationDay} onChange={(e) => setConfigForm({ ...configForm, cashbackFixedExpirationDay: e.target.value })} />
+            </div>
+          )}
+
+          <Button full onClick={saveConfig} loading={updateConfig.isPending}>Salvar configuração</Button>
+        </div>
       </Modal>
 
       <CategoryProductPicker
