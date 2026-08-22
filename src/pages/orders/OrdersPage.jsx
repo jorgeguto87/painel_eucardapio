@@ -17,10 +17,17 @@ const TABS = [
   { value: 'cancelado',    label: 'Cancelados' },
 ]
 
+const TYPE_TABS = [
+  { value: '',         label: 'Todos os canais' },
+  { value: 'delivery', label: 'Delivery' },
+  { value: 'mesa',     label: 'Mesa' },
+]
+
 export default function OrdersPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('')
-  const { data, isLoading } = useOrders(tab || undefined)
+  const [typeTab, setTypeTab] = useState('')
+  const { data, isLoading } = useOrders(tab || undefined, typeTab || undefined)
 
   const orders = data?.data || []
 
@@ -28,8 +35,23 @@ export default function OrdersPage() {
     <div>
       <TopBar title="Pedidos" />
 
-      {/* Tabs */}
-      <div className="sticky top-14 z-20 bg-bg pt-2 pb-1">
+      {/* Tipo de pedido — mesa e delivery são bem diferentes, melhor não misturar visualmente */}
+      <div className="sticky top-14 z-20 bg-bg pt-2">
+        <div className="flex gap-2 overflow-x-auto px-4 pb-2 max-w-lg mx-auto scrollbar-hide">
+          {TYPE_TABS.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setTypeTab(t.value)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                typeTab === t.value ? 'border-secondary bg-secondary text-white' : 'border-gray-200 bg-surface text-gray-500'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Status */}
         <div className="flex gap-2 overflow-x-auto px-4 pb-2 max-w-lg mx-auto scrollbar-hide">
           {TABS.map((t) => (
             <button
@@ -56,8 +78,15 @@ export default function OrdersPage() {
               <Card key={order._id} onClick={() => navigate(`/orders/${order._id}`)}>
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm">#{formatShortId(order._id)}</p>
-                    <p className="text-xs text-gray-400 truncate">{order.customerName || order.customerPhone}</p>
+                    <p className="font-semibold text-sm flex items-center gap-1.5">
+                      #{formatShortId(order._id)}
+                      {order.orderType === 'mesa' && (
+                        <span className="text-[10px] font-bold uppercase text-primary bg-primary/10 rounded-full px-1.5 py-0.5">Mesa {order.tableNumber}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {order.orderType === 'mesa' ? (order.customerName || 'Cliente na mesa') : (order.customerName || order.customerPhone)}
+                    </p>
                     <p className="text-xs text-gray-400 mt-1">{formatDateTime(order.createdAt)}</p>
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
