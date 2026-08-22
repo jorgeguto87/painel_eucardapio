@@ -67,7 +67,7 @@ export default function App() {
             <Route path="/products/adicionais" element={<RequireAdmin><AdicionaisPage /></RequireAdmin>} />
             <Route path="/products/favoritos" element={<RequireAdmin><FavoritosPage /></RequireAdmin>} />
             <Route path="/products/banners" element={<RequireAdmin><BannersPage /></RequireAdmin>} />
-            <Route path="/settings/ofertas" element={<RequireAdmin><OfertasPage /></RequireAdmin>} />
+            <Route path="/ofertas" element={<RequireAdmin><OfertasPage /></RequireAdmin>} />
             <Route path="/products/:id" element={<RequireAdmin><ProductFormPage /></RequireAdmin>} />
 
             <Route path="/whatsapp" element={<RequireAdmin><WhatsappPage /></RequireAdmin>} />
