@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, FileText, Ban, ChefHat } from 'lucide-react'
+import { MapPin, FileText, Ban, ChefHat, UtensilsCrossed, CheckCircle2 } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
@@ -27,12 +27,16 @@ export default function OrderDetailPage() {
   if (!order) return <p className="page text-center text-gray-400">Pedido não encontrado.</p>
 
   const hasAddress = order.deliveryAddress?.street
+  const isMesa = order.orderType === 'mesa'
   const canCancel = !['finalizado', 'cancelado'].includes(order.status)
   // "Iniciar preparo" é manual mesmo pra pedido pago online — o status só
   // deve virar "preparo" quando a cozinha realmente começar, não assim que
   // o pagamento for confirmado (senão o cliente vê uma informação errada
   // sobre o andamento real do pedido).
   const canStartPreparing = ['recebido', 'pago'].includes(order.status)
+  // Mesa não tem entregador pra avançar sozinho até "finalizado" — o
+  // restaurante marca "Concluído" manualmente na hora de entregar na mesa.
+  const canFinishMesa = isMesa && order.status === 'preparo'
 
   const handleCancel = () => {
     if (window.confirm('Cancelar este pedido? Essa ação não pode ser desfeita.')) {
@@ -63,6 +67,17 @@ export default function OrderDetailPage() {
             >
               <ChefHat size={15} />
               Iniciar preparo
+            </Button>
+          )}
+          {canFinishMesa && (
+            <Button
+              variant="primary"
+              className="!min-h-0 !h-9 !px-4 text-sm"
+              loading={updateStatus.isPending}
+              onClick={() => updateStatus.mutate({ id: order._id, status: 'finalizado' })}
+            >
+              <CheckCircle2 size={15} />
+              Concluir pedido
             </Button>
           )}
         </div>
@@ -114,7 +129,10 @@ export default function OrderDetailPage() {
           <h3 className="font-semibold text-sm mb-2">Pagamento</h3>
           <p className="text-sm">{PAYMENT_LABELS[order.paymentMethod]}</p>
           {order.deliveryPaymentMethod && (
-            <p className="text-sm text-gray-500 mt-1">{DELIVERY_PAYMENT_LABELS[order.deliveryPaymentMethod]}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {DELIVERY_PAYMENT_LABELS[order.deliveryPaymentMethod]}
+              {order.paymentMethod === 'cash_on_delivery' && (isMesa ? ' — na mesa' : ' — na entrega')}
+            </p>
           )}
           {order.changeRequested && (
             <div className="mt-2 bg-warning/10 rounded-xl p-3 text-sm">
@@ -123,6 +141,18 @@ export default function OrderDetailPage() {
             </div>
           )}
         </Card>
+
+        {/* Mesa */}
+        {isMesa && (
+          <Card>
+            <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <UtensilsCrossed size={16} className="text-primary" />
+              Mesa
+            </h3>
+            <p className="text-sm">Mesa {order.tableNumber}</p>
+            {order.customerName && <p className="text-sm text-gray-500 mt-1">{order.customerName}</p>}
+          </Card>
+        )}
 
         {/* Cliente e endereço */}
         {hasAddress && (
