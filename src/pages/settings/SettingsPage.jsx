@@ -15,7 +15,6 @@ const ITEMS = [
   { to: '/settings/bot',        icon: MessageSquare, label: 'Mensagens do bot', adminOnly: true },
   { to: '/settings/hours',      icon: Clock,         label: 'Horário de funcionamento' },
   { to: '/settings/payments',   icon: CreditCard,    label: 'Pagamentos', adminOnly: true },
-  { to: '/settings/ofertas',    icon: Ticket,        label: 'Ofertas (cupons e cashback)', adminOnly: true },
   { to: '/settings/deliverers', icon: Bike,          label: 'Entregadores' },
   { to: '/notices',             icon: Bell,          label: 'Avisos' },
 ]
