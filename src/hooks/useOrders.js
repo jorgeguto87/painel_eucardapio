@@ -2,11 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
 
-export const useOrders = (status) =>
+export const useOrders = (status, orderType) =>
   useQuery({
-    queryKey: ['orders', status],
+    queryKey: ['orders', status, orderType],
     queryFn:  async () => {
-      const params = status ? { status } : {}
+      const params = {}
+      if (status) params.status = status
+      if (orderType) params.orderType = orderType
       const { data } = await api.get('/orders', { params })
       return data
     },
