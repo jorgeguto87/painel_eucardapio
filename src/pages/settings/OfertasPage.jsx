@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Ticket, Wallet, Settings2 } from 'lucide-react'
+import { Plus, Trash2, Ticket, Wallet, Settings2, ChevronRight } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -7,6 +7,7 @@ import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import EmptyState from '../../components/ui/EmptyState'
+import CategoryProductPicker from '../../components/ui/CategoryProductPicker'
 import {
   useCoupons, useCreateCoupon, useUpdateCoupon, useDeleteCoupon,
   useCashbackRules, useCreateCashbackRule, useUpdateCashbackRule, useDeleteCashbackRule,
@@ -24,12 +25,15 @@ const COUPON_TYPE_LABELS = { percentage: 'Desconto %', fixed: 'Desconto fixo', f
 const RULE_TYPE_LABELS = { global: 'Todo o cardápio', category: 'Categoria específica', product: 'Produto específico' }
 
 const emptyCoupon = {
-  code: '', description: '', type: 'percentage', discountValue: '', freeProductId: '',
-  applicableCategories: '', excludedCategories: '', stackableWithCashback: true,
-  minOrderValue: '', expiresAt: '', maxUses: '', isActive: true,
+  code: '', description: '', type: 'percentage', discountValue: '', freeProductId: '', freeProductName: '',
+  usesCategories: false, applicableCategories: [],
+  usesProducts: false, applicableProducts: [], applicableProductNames: [],
+  usesMinOrder: false, minOrderValue: '',
+  stackableWithCashback: true,
+  expiresAt: '', maxUses: '',
 }
 
-const emptyRule = { type: 'global', percent: '', categoryName: '', productId: '', excludedCategories: '', description: '', isActive: true }
+const emptyRule = { type: 'global', percent: '', categoryName: '', productId: '', productName: '', excludedCategories: '', description: '' }
 
 export default function OfertasPage() {
   const [tab, setTab] = useState('coupons')
@@ -72,8 +76,10 @@ function CouponsTab() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyCoupon)
+  const [pickerOpen, setPickerOpen] = useState(null) // 'freeProduct' | 'categories' | 'products' | null
 
   const allProducts = Object.values(products || {}).flat()
+  const productsById = Object.fromEntries(allProducts.map((p) => [p._id, p]))
 
   const openNew = () => { setForm(emptyCoupon); setEditingId(null); setModalOpen(true) }
   const openEdit = (c) => {
@@ -81,13 +87,16 @@ function CouponsTab() {
       code: c.code, description: c.description || '', type: c.type,
       discountValue: c.type === 'percentage' ? c.discountValue : toReais(c.discountValue),
       freeProductId: c.freeProductId || '',
-      applicableCategories: (c.applicableCategories || []).join(', '),
-      excludedCategories: (c.excludedCategories || []).join(', '),
-      stackableWithCashback: c.stackableWithCashback,
+      freeProductName: productsById[c.freeProductId]?.name || '',
+      usesCategories: (c.applicableCategories || []).length > 0,
+      applicableCategories: c.applicableCategories || [],
+      usesProducts: (c.applicableProducts || []).length > 0,
+      applicableProducts: c.applicableProducts || [],
+      usesMinOrder: !!c.minOrderValue,
       minOrderValue: c.minOrderValue ? toReais(c.minOrderValue) : '',
+      stackableWithCashback: c.stackableWithCashback,
       expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '',
       maxUses: c.maxUses || '',
-      isActive: c.isActive,
     })
     setEditingId(c._id)
     setModalOpen(true)
@@ -101,17 +110,21 @@ function CouponsTab() {
       type: form.type,
       discountValue: form.type === 'free_item' ? 0 : (form.type === 'percentage' ? Number(form.discountValue) : toCents(form.discountValue)),
       freeProductId: form.type === 'free_item' ? (form.freeProductId || null) : null,
-      applicableCategories: form.applicableCategories.split(',').map((s) => s.trim()).filter(Boolean),
-      excludedCategories: form.excludedCategories.split(',').map((s) => s.trim()).filter(Boolean),
+      applicableCategories: form.usesCategories ? form.applicableCategories : [],
+      applicableProducts: form.usesProducts ? form.applicableProducts : [],
       stackableWithCashback: form.stackableWithCashback,
-      minOrderValue: form.minOrderValue ? toCents(form.minOrderValue) : 0,
+      minOrderValue: form.usesMinOrder && form.minOrderValue ? toCents(form.minOrderValue) : 0,
       expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
       maxUses: form.maxUses ? Number(form.maxUses) : null,
-      isActive: form.isActive,
     }
     const onSuccess = () => setModalOpen(false)
     if (editingId) updateCoupon.mutate({ id: editingId, ...payload }, { onSuccess })
     else createCoupon.mutate(payload, { onSuccess })
+  }
+
+  const toggleActive = (c, e) => {
+    e.stopPropagation()
+    updateCoupon.mutate({ id: c._id, isActive: !c.isActive })
   }
 
   if (isLoading) return <LoadingSpinner />
@@ -134,12 +147,17 @@ function CouponsTab() {
                     {c.type === 'fixed' && ` — ${formatCurrency(c.discountValue)}`}
                   </p>
                   {c.expiresAt && <p className="text-xs text-gray-400 mt-0.5">Vence em {new Date(c.expiresAt).toLocaleDateString('pt-BR')}</p>}
+                  <p className="text-xs text-gray-400 mt-0.5">{c.usedCount} uso(s)</p>
                 </div>
-                <div className="text-right">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${c.isActive ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-400'}`}>
-                    {c.isActive ? 'Ativo' : 'Inativo'}
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">{c.usedCount} uso(s)</p>
+                <div className="flex flex-col items-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => toggleActive(c, e)}
+                    className={`relative w-10 h-5.5 rounded-full transition-colors ${c.isActive ? 'bg-success' : 'bg-gray-300'}`}
+                    title={c.isActive ? 'Ativo — toque para desativar' : 'Inativo — toque para ativar'}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${c.isActive ? 'translate-x-4.5' : ''}`} />
+                  </button>
                 </div>
               </div>
             </Card>
@@ -172,26 +190,83 @@ function CouponsTab() {
           {form.type === 'free_item' && (
             <div>
               <label className="label">Produto liberado grátis</label>
-              <select className="input" value={form.freeProductId} onChange={(e) => setForm({ ...form, freeProductId: e.target.value })} required>
-                <option value="">Selecione...</option>
-                {allProducts.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-              </select>
+              <button
+                type="button"
+                onClick={() => setPickerOpen('freeProduct')}
+                className="input flex items-center justify-between text-left"
+              >
+                <span className={form.freeProductName ? 'text-secondary' : 'text-gray-400'}>
+                  {form.freeProductName || 'Selecione o produto...'}
+                </span>
+                <ChevronRight size={16} className="text-gray-300" />
+              </button>
             </div>
           )}
 
-          <Input
-            label="Categorias que valem (vazio = cardápio inteiro)"
-            value={form.applicableCategories}
-            onChange={(e) => setForm({ ...form, applicableCategories: e.target.value })}
-            placeholder="Ex: Família, Pizzas (separado por vírgula)"
-          />
-          <Input
-            label="Categorias excluídas (opcional)"
-            value={form.excludedCategories}
-            onChange={(e) => setForm({ ...form, excludedCategories: e.target.value })}
-            placeholder="Ex: Bebidas"
-          />
-          <Input label="Valor mínimo do pedido (R$, opcional)" type="number" step="0.01" min="0" value={form.minOrderValue} onChange={(e) => setForm({ ...form, minOrderValue: e.target.value })} />
+          <div className="space-y-2">
+            <label className="label">Regras do cupom (opcional — combine quantas quiser)</label>
+
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, usesCategories: !form.usesCategories })}
+              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${form.usesCategories ? 'border-primary bg-primary/5' : 'border-gray-200'}`}
+            >
+              <span className="text-sm font-medium">Categorias específicas</span>
+              <span className={`grid size-5 shrink-0 place-items-center rounded-md border-2 ${form.usesCategories ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                {form.usesCategories && <span className="size-2 rounded-sm bg-white" />}
+              </span>
+            </button>
+            {form.usesCategories && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen('categories')}
+                className="ml-2 w-[calc(100%-8px)] rounded-lg bg-bg px-4 py-2.5 text-left text-xs font-medium text-gray-500"
+              >
+                {form.applicableCategories.length > 0
+                  ? `${form.applicableCategories.length} categoria(s): ${form.applicableCategories.join(', ')}`
+                  : 'Toque para escolher as categorias...'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, usesProducts: !form.usesProducts })}
+              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${form.usesProducts ? 'border-primary bg-primary/5' : 'border-gray-200'}`}
+            >
+              <span className="text-sm font-medium">Produtos específicos</span>
+              <span className={`grid size-5 shrink-0 place-items-center rounded-md border-2 ${form.usesProducts ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                {form.usesProducts && <span className="size-2 rounded-sm bg-white" />}
+              </span>
+            </button>
+            {form.usesProducts && (
+              <button
+                type="button"
+                onClick={() => setPickerOpen('products')}
+                className="ml-2 w-[calc(100%-8px)] rounded-lg bg-bg px-4 py-2.5 text-left text-xs font-medium text-gray-500"
+              >
+                {form.applicableProducts.length > 0
+                  ? `${form.applicableProducts.length} produto(s) selecionado(s)`
+                  : 'Toque para escolher os produtos...'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, usesMinOrder: !form.usesMinOrder })}
+              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${form.usesMinOrder ? 'border-primary bg-primary/5' : 'border-gray-200'}`}
+            >
+              <span className="text-sm font-medium">Valor mínimo da compra</span>
+              <span className={`grid size-5 shrink-0 place-items-center rounded-md border-2 ${form.usesMinOrder ? 'border-primary bg-primary' : 'border-gray-300'}`}>
+                {form.usesMinOrder && <span className="size-2 rounded-sm bg-white" />}
+              </span>
+            </button>
+            {form.usesMinOrder && (
+              <div className="ml-2">
+                <Input type="number" step="0.01" min="0" placeholder="R$ 0,00" value={form.minOrderValue} onChange={(e) => setForm({ ...form, minOrderValue: e.target.value })} />
+              </div>
+            )}
+          </div>
+
           <Input label="Validade (opcional — some sozinho depois de vencer)" type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
           <Input label="Limite total de usos (opcional)" type="number" min="1" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} />
 
@@ -200,14 +275,6 @@ function CouponsTab() {
             <button type="button" onClick={() => setForm({ ...form, stackableWithCashback: !form.stackableWithCashback })}
               className={`relative w-11 h-6 rounded-full transition-colors ${form.stackableWithCashback ? 'bg-success' : 'bg-gray-300'}`}>
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.stackableWithCashback ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Ativo</span>
-            <button type="button" onClick={() => setForm({ ...form, isActive: !form.isActive })}
-              className={`relative w-11 h-6 rounded-full transition-colors ${form.isActive ? 'bg-success' : 'bg-gray-300'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.isActive ? 'translate-x-5' : ''}`} />
             </button>
           </div>
 
@@ -224,15 +291,55 @@ function CouponsTab() {
           )}
         </form>
       </Modal>
+
+      <CategoryProductPicker
+        open={pickerOpen === 'freeProduct'}
+        onClose={() => setPickerOpen(null)}
+        title="Escolher item grátis"
+        mode="products"
+        multiple={false}
+        categories={Object.keys(products || {})}
+        productsByCategory={products || {}}
+        selected={form.freeProductId ? [form.freeProductId] : []}
+        onConfirm={(picked) => setForm({ ...form, freeProductId: picked[0] || '', freeProductName: productsById[picked[0]]?.name || '' })}
+      />
+      <CategoryProductPicker
+        open={pickerOpen === 'categories'}
+        onClose={() => setPickerOpen(null)}
+        title="Escolher categorias"
+        mode="categories"
+        categories={categories || []}
+        selected={form.applicableCategories}
+        onConfirm={(picked) => setForm({ ...form, applicableCategories: picked })}
+      />
+      <CategoryProductPicker
+        open={pickerOpen === 'products'}
+        onClose={() => setPickerOpen(null)}
+        title="Escolher produtos"
+        mode="products"
+        categories={Object.keys(products || {})}
+        productsByCategory={products || {}}
+        selected={form.applicableProducts}
+        onConfirm={(picked) => setForm({ ...form, applicableProducts: picked })}
+      />
     </>
   )
 }
 
 // ─── Cashback ───────────────────────────────────────────────────────────
 
+const defaultConfigForm = {
+  cashbackEnabled: false,
+  cashbackValidityMode: 'rolling_months',
+  cashbackFixedExpirationMonth: 12,
+  cashbackFixedExpirationDay: 31,
+  cashbackRollingMonths: 6,
+  cashbackStackingMode: 'sum',
+}
+
 function CashbackTab() {
   const { data: rules, isLoading } = useCashbackRules()
-  const { data: config } = useCashbackConfig()
+  const { data: config, isLoading: configLoading } = useCashbackConfig()
   const { data: categories } = useProductCategories()
   const { data: products } = useProducts()
   const createRule = useCreateCashbackRule()
@@ -246,15 +353,25 @@ function CashbackTab() {
   const [configForm, setConfigForm] = useState(null)
 
   const allProducts = Object.values(products || {}).flat()
+  const productsById = Object.fromEntries(allProducts.map((p) => [p._id, p]))
+  const [pickerOpen, setPickerOpen] = useState(null)
 
-  useEffect(() => { if (config && !configForm) setConfigForm(config) }, [config])
+  // Antes, se a config ainda não existisse pro restaurante (ou a busca
+  // falhasse por qualquer motivo), configForm nunca era preenchido e a
+  // tela ficava presa em "carregando" pra sempre. Agora, assim que a
+  // busca termina (sucesso OU erro), preenche com o que veio, ou com
+  // valores padrão sensatos se não veio nada.
+  useEffect(() => {
+    if (!configLoading && !configForm) setConfigForm({ ...defaultConfigForm, ...(config || {}) })
+  }, [config, configLoading])
 
   const openNew = () => { setForm(emptyRule); setEditingId(null); setModalOpen(true) }
   const openEdit = (r) => {
     setForm({
       type: r.type, percent: r.percent, categoryName: r.categoryName || '',
-      productId: r.productId || '', excludedCategories: (r.excludedCategories || []).join(', '),
-      description: r.description || '', isActive: r.isActive,
+      productId: r.productId || '', productName: productsById[r.productId]?.name || '',
+      excludedCategories: (r.excludedCategories || []).join(', '),
+      description: r.description || '',
     })
     setEditingId(r._id)
     setModalOpen(true)
@@ -269,11 +386,15 @@ function CashbackTab() {
       productId: form.type === 'product' ? form.productId : null,
       excludedCategories: form.type === 'global' ? form.excludedCategories.split(',').map((s) => s.trim()).filter(Boolean) : [],
       description: form.description || null,
-      isActive: form.isActive,
     }
     const onSuccess = () => setModalOpen(false)
     if (editingId) updateRule.mutate({ id: editingId, ...payload }, { onSuccess })
     else createRule.mutate(payload, { onSuccess })
+  }
+
+  const toggleRuleActive = (r, e) => {
+    e.stopPropagation()
+    updateRule.mutate({ id: r._id, isActive: !r.isActive })
   }
 
   const saveConfig = () => {
@@ -287,7 +408,7 @@ function CashbackTab() {
     })
   }
 
-  if (isLoading || !configForm) return <LoadingSpinner />
+  if (isLoading || configLoading || !configForm) return <LoadingSpinner />
 
   return (
     <>
@@ -345,12 +466,18 @@ function CashbackTab() {
                   <p className="text-xs text-gray-400">
                     {r.percent}% de cashback
                     {r.type === 'category' && r.categoryName && ` — ${r.categoryName}`}
+                    {r.type === 'product' && productsById[r.productId] && ` — ${productsById[r.productId].name}`}
                   </p>
                   {r.description && <p className="text-xs text-gray-400 mt-0.5">{r.description}</p>}
                 </div>
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full h-fit ${r.isActive ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-400'}`}>
-                  {r.isActive ? 'Ativa' : 'Inativa'}
-                </span>
+                <button
+                  type="button"
+                  onClick={(e) => toggleRuleActive(r, e)}
+                  className={`relative w-10 h-5.5 rounded-full transition-colors shrink-0 ${r.isActive ? 'bg-success' : 'bg-gray-300'}`}
+                  title={r.isActive ? 'Ativa — toque para desativar' : 'Inativa — toque para ativar'}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow transition-transform ${r.isActive ? 'translate-x-4.5' : ''}`} />
+                </button>
               </div>
             </Card>
           ))}
@@ -371,19 +498,34 @@ function CashbackTab() {
           <Input label="Percentual de cashback" type="number" step="1" min="0" max="100" value={form.percent} onChange={(e) => setForm({ ...form, percent: e.target.value })} required />
 
           {form.type === 'category' && (
-            <Input label="Nome da categoria" value={form.categoryName} onChange={(e) => setForm({ ...form, categoryName: e.target.value })} required placeholder="Ex: Pizzas" list="categorias-cashback" />
+            <div>
+              <label className="label">Categoria</label>
+              <button
+                type="button"
+                onClick={() => setPickerOpen('category')}
+                className="input flex items-center justify-between text-left"
+              >
+                <span className={form.categoryName ? 'text-secondary' : 'text-gray-400'}>
+                  {form.categoryName || 'Selecione a categoria...'}
+                </span>
+                <ChevronRight size={16} className="text-gray-300" />
+              </button>
+            </div>
           )}
-          <datalist id="categorias-cashback">
-            {(categories || []).map((c) => <option key={c} value={c} />)}
-          </datalist>
 
           {form.type === 'product' && (
             <div>
               <label className="label">Produto</label>
-              <select className="input" value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} required>
-                <option value="">Selecione...</option>
-                {allProducts.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-              </select>
+              <button
+                type="button"
+                onClick={() => setPickerOpen('product')}
+                className="input flex items-center justify-between text-left"
+              >
+                <span className={form.productName ? 'text-secondary' : 'text-gray-400'}>
+                  {form.productName || 'Selecione o produto...'}
+                </span>
+                <ChevronRight size={16} className="text-gray-300" />
+              </button>
             </div>
           )}
 
@@ -392,14 +534,6 @@ function CashbackTab() {
           )}
 
           <Input label="Descrição (só pra você lembrar)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Ativa</span>
-            <button type="button" onClick={() => setForm({ ...form, isActive: !form.isActive })}
-              className={`relative w-11 h-6 rounded-full transition-colors ${form.isActive ? 'bg-success' : 'bg-gray-300'}`}>
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.isActive ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
 
           <Button type="submit" full loading={createRule.isPending || updateRule.isPending}>
             {editingId ? 'Salvar' : 'Criar regra'}
@@ -414,6 +548,28 @@ function CashbackTab() {
           )}
         </form>
       </Modal>
+
+      <CategoryProductPicker
+        open={pickerOpen === 'category'}
+        onClose={() => setPickerOpen(null)}
+        title="Escolher categoria"
+        mode="categories"
+        multiple={false}
+        categories={categories || []}
+        selected={form.categoryName ? [form.categoryName] : []}
+        onConfirm={(picked) => setForm({ ...form, categoryName: picked[0] || '' })}
+      />
+      <CategoryProductPicker
+        open={pickerOpen === 'product'}
+        onClose={() => setPickerOpen(null)}
+        title="Escolher produto"
+        mode="products"
+        multiple={false}
+        categories={Object.keys(products || {})}
+        productsByCategory={products || {}}
+        selected={form.productId ? [form.productId] : []}
+        onConfirm={(picked) => setForm({ ...form, productId: picked[0] || '', productName: productsById[picked[0]]?.name || '' })}
+      />
     </>
   )
 }
