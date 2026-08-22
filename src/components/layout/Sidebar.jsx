@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, MessageCircle, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, MessageCircle, Settings, LogOut, Ticket } from 'lucide-react'
 import useAuthStore from '../../stores/authStore'
 import useRestaurantStore from '../../stores/restaurantStore'
 
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/orders',    icon: ShoppingBag,     label: 'Pedidos'  },
   { to: '/products',  icon: UtensilsCrossed, label: 'Cardápio', hideForOperator: true },
   { to: '/whatsapp',  icon: MessageCircle,   label: 'WhatsApp', hideForOperator: true },
+  { to: '/ofertas',   icon: Ticket,          label: 'Ofertas',  hideForOperator: true },
   { to: '/settings',  icon: Settings,        label: 'Configurações' },   
   
 ]
