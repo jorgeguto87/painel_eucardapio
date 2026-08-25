@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: null, // registro manual em main.jsx (verifica update ativamente) — evita registro duplicado
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: 'Meu Chapa',
-        short_name: 'Meu Chapa',
+        name: 'Eu Cardapio',
+        short_name: 'Eu Cardapio',
         description: 'Gestão de restaurante no celular',
         theme_color: '#FF6B2C',
         background_color: '#F8F9FA',
