@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Trash2, ChevronDown, Check } from 'lucide-react'
+import { Trash2, ChevronDown, Check, Plus, X, GripVertical } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import ImageUploadField from '../../components/media/ImageUploadField'
-import { useProducts, useProductCategories, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../../hooks/useProducts'
+import {
+  useProducts, useProductCategories, useCreateProduct, useUpdateProduct, useDeleteProduct,
+  useCreateCategory, useVariantGroups, useCreateVariantGroup,
+} from '../../hooks/useProducts'
 import {
   useOpcionais, useOpcionalCategorias, useCreateOpcional,
   useAdicionais, useAdicionalCategorias, useFavoritos,
@@ -22,6 +25,7 @@ export default function ProductFormPage() {
 
   const { data: grouped } = useProducts()
   const { data: categories } = useProductCategories()
+  const { data: variantGroups } = useVariantGroups()
   const { data: opcionais } = useOpcionais()
   const { data: opcionalCategorias } = useOpcionalCategorias()
   const { data: adicionais } = useAdicionais()
@@ -31,15 +35,23 @@ export default function ProductFormPage() {
   const updateProduct  = useUpdateProduct()
   const deleteProduct  = useDeleteProduct()
   const createOpcional = useCreateOpcional()
+  const createCategory = useCreateCategory()
+  const createVariantGroup = useCreateVariantGroup()
 
-  // Categorias "abertas" na tela (mostrando os itens dela pra marcar/
-  // desmarcar) — só uma questão de exibição, não afeta o que é salvo.
   const [openCategories, setOpenCategories] = useState({})
+  const [novaCategoriaAberta, setNovaCategoriaAberta] = useState(false)
+  const [nomeNovaCategoria, setNomeNovaCategoria] = useState('')
 
   const [form, setForm] = useState({
     name: '', description: '', price: '', category: 'Geral', imageUrl: '', imageBase64: '',
+    pricingMode: 'simple', variantGroupIds: [],
     opcionaisIds: [], adicionaisIds: [],
   })
+
+  // Grupos de variação, montados localmente antes de salvar — cada um ou
+  // é um grupo NOVO (sem _id ainda, criado ao salvar o produto) ou uma
+  // referência a um grupo já existente (reaproveitado, com _id).
+  const [gruposVariacao, setGruposVariacao] = useState([])
 
   useEffect(() => {
     if (isEditing && grouped) {
@@ -53,17 +65,80 @@ export default function ProductFormPage() {
           category: product.category || 'Geral',
           imageUrl: product.imageUrl || '',
           imageBase64: product.imageBase64 || '',
+          pricingMode: product.pricingMode || 'simple',
+          variantGroupIds: (product.variantGroupIds || []).map((g) => g._id || g),
           opcionaisIds: (product.opcionaisIds || []).map((o) => o._id || o),
           adicionaisIds: (product.adicionaisIds || []).map((a) => a._id || a),
         })
+        if (product.variantGroupIds?.length) {
+          setGruposVariacao(product.variantGroupIds.map((g) => ({
+            _id: g._id, name: g.name, options: g.options || [], reaproveitado: true,
+          })))
+        }
       }
     }
   }, [isEditing, grouped, id])
 
   const handleChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
-  // Agrupa opcionais/adicionais (listas soltas) por categoria, pra exibir
-  // organizado em vez de uma sopa de chips misturados.
+  // ── Categoria ────────────────────────────────────────────────────────
+
+  const handleCriarCategoria = async () => {
+    const nome = nomeNovaCategoria.trim()
+    if (!nome) return
+    await createCategory.mutateAsync(nome)
+    setForm((f) => ({ ...f, category: nome }))
+    setNomeNovaCategoria('')
+    setNovaCategoriaAberta(false)
+  }
+
+  // ── Grupos de variação ───────────────────────────────────────────────
+
+  const adicionarGrupoNovo = () => {
+    setGruposVariacao((gs) => [...gs, { tempId: `novo-${Date.now()}`, name: '', options: [{ name: '', price: '0,00' }], reaproveitado: false }])
+  }
+
+  const reaproveitarGrupo = (groupId) => {
+    if (!groupId) return
+    const grupo = (variantGroups || []).find((g) => g._id === groupId)
+    if (!grupo) return
+    if (gruposVariacao.some((g) => g._id === groupId)) return // já adicionado
+    setGruposVariacao((gs) => [...gs, {
+      _id: grupo._id,
+      name: grupo.name,
+      options: grupo.options.map((o) => ({ ...o, price: String(toReais(o.price)).replace('.', ',') })),
+      reaproveitado: true,
+    }])
+  }
+
+  const removerGrupo = (index) => setGruposVariacao((gs) => gs.filter((_, i) => i !== index))
+
+  const atualizarNomeGrupo = (index, nome) => {
+    setGruposVariacao((gs) => gs.map((g, i) => (i === index ? { ...g, name: nome, reaproveitado: false } : g)))
+  }
+
+  const adicionarOpcao = (grupoIndex) => {
+    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: [...g.options, { name: '', price: '0,00' }], reaproveitado: false } : g)))
+  }
+
+  const atualizarOpcao = (grupoIndex, opcaoIndex, campo, valor) => {
+    setGruposVariacao((gs) => gs.map((g, i) => {
+      if (i !== grupoIndex) return g
+      const options = g.options.map((o, j) => (j === opcaoIndex ? { ...o, [campo]: valor } : o))
+      return { ...g, options, reaproveitado: false }
+    }))
+  }
+
+  const removerOpcao = (grupoIndex, opcaoIndex) => {
+    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: g.options.filter((_, j) => j !== opcaoIndex), reaproveitado: false } : g)))
+  }
+
+  const gruposDisponiveisPraReaproveitar = (variantGroups || []).filter(
+    (g) => !gruposVariacao.some((gv) => gv._id === g._id)
+  )
+
+  // ── Opcionais / Adicionais (inalterado) ─────────────────────────────
+
   const opcionalGroups = useMemo(() => {
     const groups = {}
     ;(opcionalCategorias || []).forEach((c) => { groups[c._id] = { name: c.name, items: [] } })
@@ -72,9 +147,7 @@ export default function ProductFormPage() {
       if (!groups[key]) groups[key] = { name: 'Sem categoria', items: [] }
       groups[key].items.push(o)
     })
-    return Object.entries(groups)
-      .map(([key, g]) => ({ key, ...g }))
-      .filter((g) => g.items.length > 0)
+    return Object.entries(groups).map(([key, g]) => ({ key, ...g })).filter((g) => g.items.length > 0)
   }, [opcionais, opcionalCategorias])
 
   const adicionalGroups = useMemo(() => {
@@ -85,60 +158,36 @@ export default function ProductFormPage() {
       if (!groups[key]) groups[key] = { name: 'Sem categoria', items: [] }
       groups[key].items.push(a)
     })
-    return Object.entries(groups)
-      .map(([key, g]) => ({ key, ...g }))
-      .filter((g) => g.items.length > 0)
+    return Object.entries(groups).map(([key, g]) => ({ key, ...g })).filter((g) => g.items.length > 0)
   }, [adicionais, adicionalCategorias])
 
   const toggleCategoryOpen = (key) => setOpenCategories((f) => ({ ...f, [key]: !f[key] }))
 
-  // Marca/desmarca a categoria inteira de uma vez (todos os itens dela) —
-  // atalho útil quando o produto usa a categoria toda.
   const toggleWholeCategory = (group, checked) => {
     const ids = group.items.map((i) => i._id)
     setForm((f) => ({
       ...f,
-      opcionaisIds: checked
-        ? [...new Set([...f.opcionaisIds, ...ids])]
-        : f.opcionaisIds.filter((x) => !ids.includes(x)),
+      opcionaisIds: checked ? [...new Set([...f.opcionaisIds, ...ids])] : f.opcionaisIds.filter((x) => !ids.includes(x)),
     }))
   }
 
-  // "Não precisa" — cria (se ainda não existir nessa categoria) um
-  // opcional especial representando "nenhuma dessas opções", e já marca
-  // ele pro produto. Evita o restaurante ter que ir lá em Opcionais criar
-  // isso manualmente toda vez.
   const addNaoPrecisa = async (group) => {
     const existing = group.items.find((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase())
     if (existing) {
-      if (!form.opcionaisIds.includes(existing._id)) {
-        setForm((f) => ({ ...f, opcionaisIds: [...f.opcionaisIds, existing._id] }))
-      }
+      if (!form.opcionaisIds.includes(existing._id)) setForm((f) => ({ ...f, opcionaisIds: [...f.opcionaisIds, existing._id] }))
       return
     }
-    const created = await createOpcional.mutateAsync({
-      name: NAO_PRECISA_NOME,
-      categoryId: group.key === SEM_CATEGORIA ? null : group.key,
-    })
+    const created = await createOpcional.mutateAsync({ name: NAO_PRECISA_NOME, categoryId: group.key === SEM_CATEGORIA ? null : group.key })
     setForm((f) => ({ ...f, opcionaisIds: [...f.opcionaisIds, created.data.data._id] }))
   }
 
   const toggleOpcional = (opcId) => {
-    setForm((f) => ({
-      ...f,
-      opcionaisIds: f.opcionaisIds.includes(opcId) ? f.opcionaisIds.filter((x) => x !== opcId) : [...f.opcionaisIds, opcId],
-    }))
+    setForm((f) => ({ ...f, opcionaisIds: f.opcionaisIds.includes(opcId) ? f.opcionaisIds.filter((x) => x !== opcId) : [...f.opcionaisIds, opcId] }))
   }
   const toggleAdicional = (adId) => {
-    setForm((f) => ({
-      ...f,
-      adicionaisIds: f.adicionaisIds.includes(adId) ? f.adicionaisIds.filter((x) => x !== adId) : [...f.adicionaisIds, adId],
-    }))
+    setForm((f) => ({ ...f, adicionaisIds: f.adicionaisIds.includes(adId) ? f.adicionaisIds.filter((x) => x !== adId) : [...f.adicionaisIds, adId] }))
   }
 
-  // Aplica um favorito: COPIA a seleção dele pra este produto (substitui a
-  // seleção atual). Editar o favorito depois não afeta produtos que já
-  // aplicaram ele antes, e vice-versa.
   const applyFavorito = (favId) => {
     const fav = (favoritos || []).find((f) => f._id === favId)
     if (!fav) return
@@ -149,28 +198,44 @@ export default function ProductFormPage() {
     }))
   }
 
-  // Ao editar um produto que já tem opcionais/adicionais escolhidos, abre
-  // de cara as categorias correspondentes — senão o restaurante teria que
-  // clicar em cada uma pra descobrir o que já estava marcado.
   useEffect(() => {
     if (!form.opcionaisIds.length && !form.adicionaisIds.length) return
     const toOpen = {}
-    opcionalGroups.forEach((g) => {
-      if (g.items.some((i) => form.opcionaisIds.includes(i._id))) toOpen[`op-${g.key}`] = true
-    })
-    adicionalGroups.forEach((g) => {
-      if (g.items.some((i) => form.adicionaisIds.includes(i._id))) toOpen[`ad-${g.key}`] = true
-    })
+    opcionalGroups.forEach((g) => { if (g.items.some((i) => form.opcionaisIds.includes(i._id))) toOpen[`op-${g.key}`] = true })
+    adicionalGroups.forEach((g) => { if (g.items.some((i) => form.adicionaisIds.includes(i._id))) toOpen[`ad-${g.key}`] = true })
     if (Object.keys(toOpen).length) setOpenCategories((f) => ({ ...f, ...toOpen }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opcionalGroups, adicionalGroups])
 
+  // ── Salvar ───────────────────────────────────────────────────────────
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    let variantGroupIds = []
+    if (form.pricingMode === 'variants') {
+      // Cria os grupos NOVOS primeiro (os que ainda não têm _id), depois
+      // junta com os IDs dos que já existiam (reaproveitados)
+      for (const grupo of gruposVariacao) {
+        if (grupo._id) {
+          variantGroupIds.push(grupo._id)
+        } else {
+          const payload = {
+            name: grupo.name,
+            options: grupo.options.map((o) => ({ name: o.name, price: toCents(String(o.price).replace(',', '.')) })),
+          }
+          const criado = await createVariantGroup.mutateAsync(payload)
+          variantGroupIds.push(criado.data.data._id)
+        }
+      }
+    }
+
     const payload = {
       name:        form.name,
       description: form.description,
-      price:       toCents(form.price),
+      pricingMode: form.pricingMode,
+      price:       form.pricingMode === 'simple' ? toCents(form.price) : 0,
+      variantGroupIds: form.pricingMode === 'variants' ? variantGroupIds : [],
       category:    form.category,
       imageUrl:    form.imageBase64 ? null : (form.imageUrl || null),
       imageBase64: form.imageBase64 || null,
@@ -192,198 +257,267 @@ export default function ProductFormPage() {
     navigate('/products')
   }
 
-  const isSaving = createProduct.isPending || updateProduct.isPending
+  const isSaving = createProduct.isPending || updateProduct.isPending || createVariantGroup.isPending
 
   return (
     <div>
       <TopBar title={isEditing ? 'Editar produto' : 'Novo produto'} back />
 
-      <form onSubmit={handleSubmit} className="page space-y-4">
-        <Input label="Nome" value={form.name} onChange={handleChange('name')} placeholder="Ex: X-Burguer" required />
-
+      <form onSubmit={handleSubmit} className="page space-y-5">
         <div>
-          <label className="label">Descrição</label>
-          <textarea
-            className="input min-h-[80px] py-3"
-            value={form.description}
-            onChange={handleChange('description')}
-            placeholder="Ingredientes, detalhes..."
-          />
-        </div>
-
-        <Input
-          label="Preço (R$)"
-          type="number"
-          step="0.01"
-          min="0"
-          value={form.price}
-          onChange={handleChange('price')}
-          placeholder="0,00"
-          required
-        />
-
-        <div>
-          <label className="label">Categoria</label>
-          <input
-            className="input"
-            list="product-categories"
-            value={form.category}
-            onChange={handleChange('category')}
-            placeholder="Ex: Lanches, Bebidas"
-          />
-          <datalist id="product-categories">
-            {(categories || []).map((c) => <option key={c} value={c} />)}
-          </datalist>
-          <p className="text-xs text-gray-400 mt-1">Escolha uma categoria já usada ou digite uma nova.</p>
-        </div>
-
-        <ImageUploadField
-          label="Imagem do produto (opcional)"
-          imageUrl={form.imageUrl}
-          imageBase64={form.imageBase64}
-          onChange={({ imageUrl, imageBase64 }) => setForm((f) => ({
-            ...f,
-            imageUrl: imageUrl !== undefined ? imageUrl : f.imageUrl,
-            imageBase64: imageBase64 !== undefined ? imageBase64 : f.imageBase64,
-          }))}
-        />
-
-        {favoritos?.length > 0 && (
-          <div>
-            <label className="label">Aplicar um favorito</label>
-            <select className="input" defaultValue="" onChange={(e) => e.target.value && applyFavorito(e.target.value)}>
-              <option value="">Escolher um pacote pronto...</option>
-              {favoritos.map((f) => <option key={f._id} value={f._id}>{f.name}</option>)}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              Substitui a seleção abaixo pela do favorito escolhido — depois você ainda pode ajustar.
-            </p>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1">1 · Informações do produto</p>
+          <Input label="Nome" value={form.name} onChange={handleChange('name')} placeholder="Ex: X-Burguer especial" required />
+          <div className="mt-3">
+            <label className="label">Descrição</label>
+            <textarea className="input min-h-[80px] py-3" value={form.description} onChange={handleChange('description')} placeholder="Ingredientes e detalhes importantes" />
           </div>
-        )}
+        </div>
 
-        {opcionalGroups.length > 0 && (
-          <div>
-            <label className="label">Opcionais deste produto (grátis)</label>
-            <p className="text-xs text-gray-400 mb-2">
-              Marque as categorias que esse produto usa. Ao abrir uma categoria, escolha quais itens dela ficam disponíveis.
-            </p>
-            <div className="space-y-2">
-              {opcionalGroups.map((group) => {
-                const groupIds = group.items.map((i) => i._id)
-                const selectedCount = groupIds.filter((id) => form.opcionaisIds.includes(id)).length
-                const isOpen = !!openCategories[`op-${group.key}`]
-                const hasNaoPrecisa = group.items.some((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase() && form.opcionaisIds.includes(i._id))
+        <div>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1">2 · Categoria</p>
+          <div className="flex flex-wrap gap-2">
+            {(categories || []).map((c) => (
+              <button
+                key={c.name}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, category: c.name }))}
+                className={`text-xs font-medium px-3 py-2 rounded-xl border transition-colors flex items-center gap-1 ${
+                  form.category === c.name ? 'bg-primary text-white border-primary' : 'border-gray-200 text-secondary hover:bg-bg'
+                }`}
+              >
+                {form.category === c.name && <Check size={12} />} {c.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setNovaCategoriaAberta((v) => !v)}
+              className="text-xs font-medium px-3 py-2 rounded-xl border border-dashed border-gray-300 text-gray-400 hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <Plus size={12} /> Criar categoria
+            </button>
+          </div>
+          {novaCategoriaAberta && (
+            <div className="flex gap-2 mt-2">
+              <input
+                autoFocus
+                value={nomeNovaCategoria}
+                onChange={(e) => setNomeNovaCategoria(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCriarCategoria())}
+                placeholder="Nome da nova categoria"
+                className="flex-1 text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <button type="button" onClick={handleCriarCategoria} className="px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold">
+                Criar
+              </button>
+            </div>
+          )}
+        </div>
 
-                return (
-                  <div key={group.key} className="border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleCategoryOpen(`op-${group.key}`)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 bg-bg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          role="checkbox"
-                          aria-checked={selectedCount > 0}
-                          onClick={(e) => { e.stopPropagation(); toggleWholeCategory(group, selectedCount === 0) }}
-                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${selectedCount > 0 ? 'bg-primary border-primary' : 'border-gray-300'}`}
-                        >
-                          {selectedCount > 0 && <Check size={13} className="text-white" />}
-                        </span>
-                        <span className="text-sm font-medium">{group.name}</span>
-                        {selectedCount > 0 && (
-                          <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{selectedCount} selecionado{selectedCount > 1 ? 's' : ''}</span>
-                        )}
-                      </div>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <div>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1">3 · Preço</p>
+          <p className="text-xs text-gray-400 mb-2">Escolha uma das formas de cobrar.</p>
+          <div className="flex bg-bg rounded-xl p-1 mb-3">
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, pricingMode: 'simple' }))}
+              className={`flex-1 text-xs font-semibold py-2.5 rounded-lg transition-colors ${form.pricingMode === 'simple' ? 'bg-secondary text-white' : 'text-gray-400'}`}
+            >
+              Preço simples
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, pricingMode: 'variants' }))}
+              className={`flex-1 text-xs font-semibold py-2.5 rounded-lg transition-colors ${form.pricingMode === 'variants' ? 'bg-secondary text-white' : 'text-gray-400'}`}
+            >
+              Com variações
+            </button>
+          </div>
+
+          {form.pricingMode === 'simple' ? (
+            <Input label="Valor" type="number" step="0.01" min="0" value={form.price} onChange={handleChange('price')} placeholder="0,00" required />
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400">Você pode usar mais de um grupo neste produto.</p>
+
+              {gruposVariacao.map((grupo, grupoIndex) => (
+                <div key={grupo._id || grupo.tempId} className="border border-gray-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <GripVertical size={14} className="text-gray-300 shrink-0" />
+                    <input
+                      value={grupo.name}
+                      onChange={(e) => atualizarNomeGrupo(grupoIndex, e.target.value)}
+                      placeholder="Ex: Qual carne?"
+                      className="flex-1 text-sm px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <button type="button" onClick={() => removerGrupo(grupoIndex)} className="p-2 text-gray-300 hover:text-danger">
+                      <Trash2 size={15} />
                     </button>
+                  </div>
 
-                    {isOpen && (
-                      <div className="p-3 space-y-2 border-t border-gray-100">
-                        <div className="flex flex-wrap gap-2">
-                          {group.items.map((o) => (
-                            <button
-                              key={o._id}
-                              type="button"
-                              onClick={() => toggleOpcional(o._id)}
-                              className={`text-xs px-3 py-1.5 rounded-full border ${form.opcionaisIds.includes(o._id) ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}
-                            >
-                              {o.name}
+                  <div className="space-y-1.5 pl-5">
+                    {grupo.options.map((opcao, opcaoIndex) => (
+                      <div key={opcaoIndex} className="flex items-center gap-2">
+                        <input
+                          value={opcao.name}
+                          onChange={(e) => atualizarOpcao(grupoIndex, opcaoIndex, 'name', e.target.value)}
+                          placeholder="Nome da opção"
+                          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <input
+                          value={opcao.price}
+                          onChange={(e) => atualizarOpcao(grupoIndex, opcaoIndex, 'price', e.target.value)}
+                          placeholder="R$ 0,00"
+                          className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <button type="button" onClick={() => removerOpcao(grupoIndex, opcaoIndex)} className="text-gray-300 hover:text-danger shrink-0">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => adicionarOpcao(grupoIndex)} className="text-xs text-primary font-medium flex items-center gap-1">
+                      <Plus size={12} /> Adicionar opção
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 pl-5">As opções aparecem somente quando o cliente abre os detalhes do produto.</p>
+                </div>
+              ))}
+
+              <div className="flex flex-wrap gap-2 items-center">
+                <button
+                  type="button"
+                  onClick={adicionarGrupoNovo}
+                  className="text-xs font-semibold px-3 py-2 rounded-xl border border-dashed border-gray-300 text-gray-500 hover:border-primary hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  <Plus size={13} /> Novo grupo
+                </button>
+                {gruposDisponiveisPraReaproveitar.length > 0 && (
+                  <select
+                    defaultValue=""
+                    onChange={(e) => { reaproveitarGrupo(e.target.value); e.target.value = '' }}
+                    className="text-xs px-3 py-2 rounded-xl border border-primary/40 text-primary"
+                  >
+                    <option value="">Reaproveitar grupo...</option>
+                    {gruposDisponiveisPraReaproveitar.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)}
+                  </select>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1">4 · Imagem</p>
+          <ImageUploadField
+            label="Uma boa foto ajuda o cliente a decidir."
+            imageUrl={form.imageUrl}
+            imageBase64={form.imageBase64}
+            onChange={({ imageUrl, imageBase64 }) => setForm((f) => ({
+              ...f,
+              imageUrl: imageUrl !== undefined ? imageUrl : f.imageUrl,
+              imageBase64: imageBase64 !== undefined ? imageBase64 : f.imageBase64,
+            }))}
+          />
+        </div>
+
+        <div>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-wide mb-1">5 · Escolhas e adicionais</p>
+          <p className="text-xs text-gray-400 mb-2">Tudo organizado em um só lugar.</p>
+
+          {favoritos?.length > 0 && (
+            <div className="mb-3">
+              <label className="label">Aplicar um favorito</label>
+              <select className="input" defaultValue="" onChange={(e) => e.target.value && applyFavorito(e.target.value)}>
+                <option value="">Escolher um pacote pronto...</option>
+                {favoritos.map((f) => <option key={f._id} value={f._id}>{f.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {opcionalGroups.length > 0 && (
+            <div className="mb-3">
+              <label className="label">Escolhas grátis</label>
+              <div className="space-y-2">
+                {opcionalGroups.map((group) => {
+                  const groupIds = group.items.map((i) => i._id)
+                  const selectedCount = groupIds.filter((gid) => form.opcionaisIds.includes(gid)).length
+                  const isOpen = !!openCategories[`op-${group.key}`]
+                  const hasNaoPrecisa = group.items.some((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase() && form.opcionaisIds.includes(i._id))
+
+                  return (
+                    <div key={group.key} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <button type="button" onClick={() => toggleCategoryOpen(`op-${group.key}`)} className="w-full flex items-center justify-between px-3 py-2.5 bg-bg">
+                        <div className="flex items-center gap-2">
+                          <span
+                            role="checkbox" aria-checked={selectedCount > 0}
+                            onClick={(e) => { e.stopPropagation(); toggleWholeCategory(group, selectedCount === 0) }}
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 ${selectedCount > 0 ? 'bg-primary border-primary' : 'border-gray-300'}`}
+                          >
+                            {selectedCount > 0 && <Check size={13} className="text-white" />}
+                          </span>
+                          <span className="text-sm font-medium">{group.name}</span>
+                          {selectedCount > 0 && <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{selectedCount} selecionado{selectedCount > 1 ? 's' : ''}</span>}
+                        </div>
+                        <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isOpen && (
+                        <div className="p-3 space-y-2 border-t border-gray-100">
+                          <div className="flex flex-wrap gap-2">
+                            {group.items.map((o) => (
+                              <button key={o._id} type="button" onClick={() => toggleOpcional(o._id)}
+                                className={`text-xs px-3 py-1.5 rounded-full border ${form.opcionaisIds.includes(o._id) ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}>
+                                {o.name}
+                              </button>
+                            ))}
+                          </div>
+                          {!hasNaoPrecisa && (
+                            <button type="button" onClick={() => addNaoPrecisa(group)} disabled={createOpcional.isPending} className="text-xs text-gray-400 underline underline-offset-2 disabled:opacity-50">
+                              + Adicionar opção "Não precisa" nessa categoria
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {adicionalGroups.length > 0 && (
+            <div>
+              <label className="label">Adicionais pagos</label>
+              <div className="space-y-2">
+                {adicionalGroups.map((group) => {
+                  const groupIds = group.items.map((i) => i._id)
+                  const selectedCount = groupIds.filter((gid) => form.adicionaisIds.includes(gid)).length
+                  const isOpen = !!openCategories[`ad-${group.key}`]
+
+                  return (
+                    <div key={group.key} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <button type="button" onClick={() => toggleCategoryOpen(`ad-${group.key}`)} className="w-full flex items-center justify-between px-3 py-2.5 bg-bg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{group.name}</span>
+                          {selectedCount > 0 && <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{selectedCount} selecionado{selectedCount > 1 ? 's' : ''}</span>}
+                        </div>
+                        <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isOpen && (
+                        <div className="p-3 flex flex-wrap gap-2 border-t border-gray-100">
+                          {group.items.map((a) => (
+                            <button key={a._id} type="button" onClick={() => toggleAdicional(a._id)}
+                              className={`text-xs px-3 py-1.5 rounded-full border ${form.adicionaisIds.includes(a._id) ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}>
+                              {a.name} · {formatCurrency(a.price)}
                             </button>
                           ))}
                         </div>
-
-                        {!hasNaoPrecisa && (
-                          <button
-                            type="button"
-                            onClick={() => addNaoPrecisa(group)}
-                            disabled={createOpcional.isPending}
-                            className="text-xs text-gray-400 underline underline-offset-2 disabled:opacity-50"
-                          >
-                            + Adicionar opção "Não precisa" nessa categoria
-                          </button>
-                        )}
-                        <p className="text-xs text-gray-400">
-                          No cardápio, o cliente vê essa categoria como pergunta de escolha única — se quiser que ele possa
-                          recusar (ex: "sem molho"), inclua a opção "Não precisa" acima.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
-
-        {adicionalGroups.length > 0 && (
-          <div>
-            <label className="label">Adicionais deste produto (pagos)</label>
-            <p className="text-xs text-gray-400 mb-2">
-              Marque as categorias que esse produto usa, e dentro dela escolha os itens disponíveis.
-            </p>
-            <div className="space-y-2">
-              {adicionalGroups.map((group) => {
-                const groupIds = group.items.map((i) => i._id)
-                const selectedCount = groupIds.filter((id) => form.adicionaisIds.includes(id)).length
-                const isOpen = !!openCategories[`ad-${group.key}`]
-
-                return (
-                  <div key={group.key} className="border border-gray-200 rounded-xl overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleCategoryOpen(`ad-${group.key}`)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 bg-bg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{group.name}</span>
-                        {selectedCount > 0 && (
-                          <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{selectedCount} selecionado{selectedCount > 1 ? 's' : ''}</span>
-                        )}
-                      </div>
-                      <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isOpen && (
-                      <div className="p-3 flex flex-wrap gap-2 border-t border-gray-100">
-                        {group.items.map((a) => (
-                          <button
-                            key={a._id}
-                            type="button"
-                            onClick={() => toggleAdicional(a._id)}
-                            className={`text-xs px-3 py-1.5 rounded-full border ${form.adicionaisIds.includes(a._id) ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}
-                          >
-                            {a.name} · {formatCurrency(a.price)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <Button type="submit" full loading={isSaving}>
           {isEditing ? 'Salvar alterações' : 'Adicionar ao cardápio'}
@@ -391,8 +525,7 @@ export default function ProductFormPage() {
 
         {isEditing && (
           <Button type="button" variant="danger" full onClick={handleDelete} loading={deleteProduct.isPending}>
-            <Trash2 size={16} />
-            Remover produto
+            <Trash2 size={16} /> Remover produto
           </Button>
         )}
       </form>
