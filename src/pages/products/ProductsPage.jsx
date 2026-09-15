@@ -153,19 +153,27 @@ export default function ProductsPage() {
 
   const toggleExpandir = (nome) => setExpandidas((prev) => ({ ...prev, [nome]: !prev[nome] }))
 
-  const handleDragEndCategorias = (event) => {
+  const handleDragEndCategorias = async (event) => {
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = categoriasOrdenadas.findIndex((c) => c.name === active.id)
     const newIndex = categoriasOrdenadas.findIndex((c) => c.name === over.id)
     const novaOrdem = arrayMove(categoriasOrdenadas, oldIndex, newIndex)
 
-    // Só reordena categorias que têm registro de verdade (id) — as "sem
-    // registro" (dado antigo, nunca usado ainda) ganham posição só quando
-    // o restaurante efetivamente mexer nelas pela primeira vez.
-    const items = novaOrdem
-      .map((c, index) => ({ id: c.id, sortOrder: index }))
-      .filter((c) => c.id)
+    // Categoria "antiga" (dado de antes dessa funcionalidade existir)
+    // ainda não tem registro próprio — cria agora, na hora, em vez de só
+    // descartar ela da lista (que fazia o arrastar nunca salvar nada,
+    // se TODAS as categorias fossem desse tipo).
+    const items = await Promise.all(
+      novaOrdem.map(async (c, index) => {
+        if (c.id) return { id: c.id, sortOrder: index }
+        // Chamada direta (sem o hook) — evita disparar vários toasts de
+        // "Categoria criada!" de uma vez, o que ficaria estranho durante
+        // um simples arrastar.
+        const resposta = await api.post('/products/categories', { name: c.name })
+        return { id: resposta.data.data._id, sortOrder: index }
+      })
+    )
     reorderCategories.mutate(items)
   }
 
