@@ -15,8 +15,7 @@ import OrdersPage from './pages/orders/OrdersPage'
 import OrderDetailPage from './pages/orders/OrderDetailPage'
 import ProductsPage from './pages/products/ProductsPage'
 import ProductFormPage from './pages/products/ProductFormPage'
-import OpcionaisPage from './pages/products/OpcionaisPage'
-import AdicionaisPage from './pages/products/AdicionaisPage'
+import OpcionaisAdicionaisPage from './pages/products/OpcionaisAdicionaisPage'
 import FavoritosPage from './pages/products/FavoritosPage'
 import WhatsappPage from './pages/whatsapp/WhatsappPage'
 import SettingsPage from './pages/settings/SettingsPage'
@@ -63,8 +62,7 @@ export default function App() {
 
             <Route path="/products" element={<RequireAdmin><ProductsPage /></RequireAdmin>} />
             <Route path="/products/new" element={<RequireAdmin><ProductFormPage /></RequireAdmin>} />
-            <Route path="/products/opcionais" element={<RequireAdmin><OpcionaisPage /></RequireAdmin>} />
-            <Route path="/products/adicionais" element={<RequireAdmin><AdicionaisPage /></RequireAdmin>} />
+            <Route path="/products/opcionais-adicionais" element={<RequireAdmin><OpcionaisAdicionaisPage /></RequireAdmin>} />
             <Route path="/products/favoritos" element={<RequireAdmin><FavoritosPage /></RequireAdmin>} />
             <Route path="/products/banners" element={<RequireAdmin><BannersPage /></RequireAdmin>} />
             <Route path="/ofertas" element={<RequireAdmin><OfertasPage /></RequireAdmin>} />
