@@ -24,9 +24,9 @@ function ProdutoArrastavel({ product, navigate, toggleProduct }) {
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
 
   const precoExibido = product.pricingMode === 'variants'
-    ? `A partir de ${formatCurrency(
-        Math.min(...(product.variantGroupIds?.[0]?.options?.map((o) => o.price) || [product.price]))
-      )}`
+    ? (product.variantGroups?.[0]?.options?.length
+        ? `A partir de ${formatCurrency(Math.min(...product.variantGroups[0].options.map((o) => o.price)))}`
+        : 'Sem preço definido')
     : formatCurrency(product.price)
 
   return (
