@@ -87,35 +87,12 @@ export const useReorderProducts = () => {
 
 // ── Grupos de variação ──────────────────────────────────────────────────
 
-export const useVariantGroups = () =>
+// Sugestões de grupo de variação pra reaproveitar como MODELO (nome do
+// grupo + nome das opções, nunca preço) — não existe mais coleção própria
+// de grupo, isso é só um atalho de preenchimento derivado dos produtos
+// que já existem.
+export const useVariantGroupTemplates = () =>
   useQuery({
-    queryKey: ['variant-groups'],
-    queryFn:  async () => (await api.get('/products/variant-groups')).data.data,
+    queryKey: ['variant-group-templates'],
+    queryFn:  async () => (await api.get('/products/variant-group-templates')).data.data,
   })
-
-export const useCreateVariantGroup = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (payload) => api.post('/products/variant-groups', payload),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['variant-groups'] }); toast.success('Grupo de variação criado!') },
-    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao criar grupo'),
-  })
-}
-
-export const useUpdateVariantGroup = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, ...payload }) => api.patch(`/products/variant-groups/${id}`, payload),
-    onSuccess:  () => qc.invalidateQueries({ queryKey: ['variant-groups'] }),
-    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao atualizar grupo'),
-  })
-}
-
-export const useDeleteVariantGroup = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id) => api.delete(`/products/variant-groups/${id}`),
-    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['variant-groups'] }); qc.invalidateQueries({ queryKey: ['products'] }) },
-    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao apagar grupo'),
-  })
-}
