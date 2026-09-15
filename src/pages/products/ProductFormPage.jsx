@@ -7,16 +7,21 @@ import Button from '../../components/ui/Button'
 import ImageUploadField from '../../components/media/ImageUploadField'
 import {
   useProducts, useProductCategories, useCreateProduct, useUpdateProduct, useDeleteProduct,
-  useCreateCategory, useVariantGroups, useCreateVariantGroup,
+  useCreateCategory, useVariantGroups, useCreateVariantGroup, useUpdateVariantGroup,
 } from '../../hooks/useProducts'
 import {
   useOpcionais, useOpcionalCategorias, useCreateOpcional,
   useAdicionais, useAdicionalCategorias, useFavoritos,
 } from '../../hooks/useAddons'
-import { toCents, toReais, formatCurrency } from '../../utils/format'
+import { toCents, formatCurrency } from '../../utils/format'
 
 const SEM_CATEGORIA = 'sem-categoria'
 const NAO_PRECISA_NOME = 'Não precisa'
+
+// Centavos → string com vírgula, sempre com 2 casas (ex: 2000 → "20,00").
+// toReais sozinho não garante isso (2000 → 20, sem casas decimais) —
+// causava o valor aparecer sem vírgula quando era um número "redondo".
+const formatarPrecoParaInput = (cents = 0) => (cents / 100).toFixed(2).replace('.', ',')
 
 export default function ProductFormPage() {
   const { id } = useParams()
@@ -37,6 +42,7 @@ export default function ProductFormPage() {
   const createOpcional = useCreateOpcional()
   const createCategory = useCreateCategory()
   const createVariantGroup = useCreateVariantGroup()
+  const updateVariantGroup = useUpdateVariantGroup()
 
   const [openCategories, setOpenCategories] = useState({})
   const [novaCategoriaAberta, setNovaCategoriaAberta] = useState(false)
@@ -48,9 +54,12 @@ export default function ProductFormPage() {
     opcionaisIds: [], adicionaisIds: [],
   })
 
-  // Grupos de variação, montados localmente antes de salvar — cada um ou
-  // é um grupo NOVO (sem _id ainda, criado ao salvar o produto) ou uma
-  // referência a um grupo já existente (reaproveitado, com _id).
+  // Grupos de variação, montados localmente antes de salvar. Tem _id só
+  // quando pertence DE VERDADE a este produto (carregado pra edição) —
+  // nesse caso, salvar atualiza o grupo existente. Sem _id, é sempre
+  // criado como grupo novo, próprio deste produto — inclusive quando
+  // "reaproveitado" (isso só copia nome, nunca o _id nem o preço, ver
+  // reaproveitarGrupo abaixo).
   const [gruposVariacao, setGruposVariacao] = useState([])
 
   useEffect(() => {
@@ -61,7 +70,7 @@ export default function ProductFormPage() {
         setForm({
           name: product.name,
           description: product.description || '',
-          price: String(toReais(product.price)),
+          price: formatarPrecoParaInput(product.price),
           category: product.category || 'Geral',
           imageUrl: product.imageUrl || '',
           imageBase64: product.imageBase64 || '',
@@ -72,7 +81,8 @@ export default function ProductFormPage() {
         })
         if (product.variantGroupIds?.length) {
           setGruposVariacao(product.variantGroupIds.map((g) => ({
-            _id: g._id, name: g.name, options: g.options || [], reaproveitado: true,
+            _id: g._id, name: g.name,
+            options: (g.options || []).map((o) => ({ ...o, price: formatarPrecoParaInput(o.price) })),
           })))
         }
       }
@@ -95,47 +105,50 @@ export default function ProductFormPage() {
   // ── Grupos de variação ───────────────────────────────────────────────
 
   const adicionarGrupoNovo = () => {
-    setGruposVariacao((gs) => [...gs, { tempId: `novo-${Date.now()}`, name: '', options: [{ name: '', price: '0,00' }], reaproveitado: false }])
+    setGruposVariacao((gs) => [...gs, { tempId: `novo-${Date.now()}`, name: '', options: [{ name: '', price: '0,00' }] }])
   }
 
+  // "Reaproveitar" copia só a ESTRUTURA (nome do grupo + nome das opções)
+  // como ponto de partida — nunca o preço, e nunca o _id do grupo antigo.
+  // Sem isso, editar o preço aqui alteraria silenciosamente o preço de
+  // TODOS os outros produtos que usam aquele grupo, o que não faz
+  // sentido nesse sistema (não existe preço base pra variação somar —
+  // o valor da opção É o preço final, então precisa ser digitado de
+  // novo, específico pra cada produto).
   const reaproveitarGrupo = (groupId) => {
     if (!groupId) return
     const grupo = (variantGroups || []).find((g) => g._id === groupId)
     if (!grupo) return
-    if (gruposVariacao.some((g) => g._id === groupId)) return // já adicionado
     setGruposVariacao((gs) => [...gs, {
-      _id: grupo._id,
+      tempId: `reaproveitado-${Date.now()}`,
       name: grupo.name,
-      options: grupo.options.map((o) => ({ ...o, price: String(toReais(o.price)).replace('.', ',') })),
-      reaproveitado: true,
+      options: grupo.options.map((o) => ({ name: o.name, price: '' })),
     }])
   }
 
   const removerGrupo = (index) => setGruposVariacao((gs) => gs.filter((_, i) => i !== index))
 
   const atualizarNomeGrupo = (index, nome) => {
-    setGruposVariacao((gs) => gs.map((g, i) => (i === index ? { ...g, name: nome, reaproveitado: false } : g)))
+    setGruposVariacao((gs) => gs.map((g, i) => (i === index ? { ...g, name: nome } : g)))
   }
 
   const adicionarOpcao = (grupoIndex) => {
-    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: [...g.options, { name: '', price: '0,00' }], reaproveitado: false } : g)))
+    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: [...g.options, { name: '', price: '0,00' }] } : g)))
   }
 
   const atualizarOpcao = (grupoIndex, opcaoIndex, campo, valor) => {
     setGruposVariacao((gs) => gs.map((g, i) => {
       if (i !== grupoIndex) return g
       const options = g.options.map((o, j) => (j === opcaoIndex ? { ...o, [campo]: valor } : o))
-      return { ...g, options, reaproveitado: false }
+      return { ...g, options }
     }))
   }
 
   const removerOpcao = (grupoIndex, opcaoIndex) => {
-    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: g.options.filter((_, j) => j !== opcaoIndex), reaproveitado: false } : g)))
+    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: g.options.filter((_, j) => j !== opcaoIndex) } : g)))
   }
 
-  const gruposDisponiveisPraReaproveitar = (variantGroups || []).filter(
-    (g) => !gruposVariacao.some((gv) => gv._id === g._id)
-  )
+  const gruposDisponiveisPraReaproveitar = variantGroups || []
 
   // ── Opcionais / Adicionais (inalterado) ─────────────────────────────
 
@@ -217,13 +230,20 @@ export default function ProductFormPage() {
       // Cria os grupos NOVOS primeiro (os que ainda não têm _id), depois
       // junta com os IDs dos que já existiam (reaproveitados)
       for (const grupo of gruposVariacao) {
+        const payload = {
+          name: grupo.name,
+          options: grupo.options.map((o) => ({ name: o.name, price: toCents(String(o.price).replace(',', '.')) })),
+        }
         if (grupo._id) {
+          // Grupo pertence a ESTE produto (veio do carregamento dele pra
+          // edição) — atualiza de verdade, senão a edição feita aqui nunca
+          // seria salva.
+          await updateVariantGroup.mutateAsync({ id: grupo._id, ...payload })
           variantGroupIds.push(grupo._id)
         } else {
-          const payload = {
-            name: grupo.name,
-            options: grupo.options.map((o) => ({ name: o.name, price: toCents(String(o.price).replace(',', '.')) })),
-          }
+          // Novo — seja do zero, seja "reaproveitado" como modelo de nome
+          // (nesse caso o preço veio em branco, preenchido agora) — sempre
+          // cria um grupo próprio desse produto, nunca compartilhado.
           const criado = await createVariantGroup.mutateAsync(payload)
           variantGroupIds.push(criado.data.data._id)
         }
@@ -257,7 +277,7 @@ export default function ProductFormPage() {
     navigate('/products')
   }
 
-  const isSaving = createProduct.isPending || updateProduct.isPending || createVariantGroup.isPending
+  const isSaving = createProduct.isPending || updateProduct.isPending || createVariantGroup.isPending || updateVariantGroup.isPending
 
   return (
     <div>
