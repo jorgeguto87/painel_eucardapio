@@ -7,13 +7,20 @@ import Button from '../../components/ui/Button'
 import ImageUploadField from '../../components/media/ImageUploadField'
 import {
   useProducts, useProductCategories, useCreateProduct, useUpdateProduct, useDeleteProduct,
-  useCreateCategory, useVariantGroups, useCreateVariantGroup, useUpdateVariantGroup,
+  useCreateCategory, useVariantGroupTemplates,
 } from '../../hooks/useProducts'
 import {
   useOpcionais, useOpcionalCategorias, useCreateOpcional,
   useAdicionais, useAdicionalCategorias, useFavoritos,
 } from '../../hooks/useAddons'
 import { toCents, formatCurrency } from '../../utils/format'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const SEM_CATEGORIA = 'sem-categoria'
 const NAO_PRECISA_NOME = 'Não precisa'
@@ -23,6 +30,37 @@ const NAO_PRECISA_NOME = 'Não precisa'
 // causava o valor aparecer sem vírgula quando era um número "redondo".
 const formatarPrecoParaInput = (cents = 0) => (cents / 100).toFixed(2).replace('.', ',')
 
+// Uma opção arrastável dentro de um grupo de variação — reordenar aqui só
+// afeta a ordem de exibição DESSE produto, nunca cria nem edita nenhum
+// registro compartilhado (variação não vive em coleção separada).
+function OpcaoArrastavel({ id, opcao, onChangeNome, onChangePreco, onRemover }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
+      <button type="button" {...attributes} {...listeners} className="touch-none text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing shrink-0">
+        <GripVertical size={14} />
+      </button>
+      <input
+        value={opcao.name}
+        onChange={(e) => onChangeNome(e.target.value)}
+        placeholder="Nome da opção"
+        className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+      <input
+        value={opcao.price}
+        onChange={(e) => onChangePreco(e.target.value)}
+        placeholder="R$ 0,00"
+        className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+      <button type="button" onClick={onRemover} className="text-gray-300 hover:text-danger shrink-0">
+        <X size={14} />
+      </button>
+    </div>
+  )
+}
+
 export default function ProductFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -30,7 +68,7 @@ export default function ProductFormPage() {
 
   const { data: grouped } = useProducts()
   const { data: categories } = useProductCategories()
-  const { data: variantGroups } = useVariantGroups()
+  const { data: variantGroupTemplates } = useVariantGroupTemplates()
   const { data: opcionais } = useOpcionais()
   const { data: opcionalCategorias } = useOpcionalCategorias()
   const { data: adicionais } = useAdicionais()
@@ -41,8 +79,7 @@ export default function ProductFormPage() {
   const deleteProduct  = useDeleteProduct()
   const createOpcional = useCreateOpcional()
   const createCategory = useCreateCategory()
-  const createVariantGroup = useCreateVariantGroup()
-  const updateVariantGroup = useUpdateVariantGroup()
+
 
   const [openCategories, setOpenCategories] = useState({})
   const [novaCategoriaAberta, setNovaCategoriaAberta] = useState(false)
@@ -50,7 +87,7 @@ export default function ProductFormPage() {
 
   const [form, setForm] = useState({
     name: '', description: '', price: '', category: 'Geral', imageUrl: '', imageBase64: '',
-    pricingMode: 'simple', variantGroupIds: [],
+    pricingMode: 'simple',
     opcionaisIds: [], adicionaisIds: [],
   })
 
@@ -75,14 +112,13 @@ export default function ProductFormPage() {
           imageUrl: product.imageUrl || '',
           imageBase64: product.imageBase64 || '',
           pricingMode: product.pricingMode || 'simple',
-          variantGroupIds: (product.variantGroupIds || []).map((g) => g._id || g),
           opcionaisIds: (product.opcionaisIds || []).map((o) => o._id || o),
           adicionaisIds: (product.adicionaisIds || []).map((a) => a._id || a),
         })
-        if (product.variantGroupIds?.length) {
-          setGruposVariacao(product.variantGroupIds.map((g) => ({
-            _id: g._id, name: g.name,
-            options: (g.options || []).map((o) => ({ ...o, price: formatarPrecoParaInput(o.price) })),
+        if (product.variantGroups?.length) {
+          setGruposVariacao(product.variantGroups.map((g) => ({
+            _key: crypto.randomUUID(), name: g.name,
+            options: (g.options || []).map((o) => ({ _key: crypto.randomUUID(), name: o.name, price: formatarPrecoParaInput(o.price) })),
           })))
         }
       }
@@ -105,7 +141,7 @@ export default function ProductFormPage() {
   // ── Grupos de variação ───────────────────────────────────────────────
 
   const adicionarGrupoNovo = () => {
-    setGruposVariacao((gs) => [...gs, { tempId: `novo-${Date.now()}`, name: '', options: [{ name: '', price: '0,00' }] }])
+    setGruposVariacao((gs) => [...gs, { _key: crypto.randomUUID(), name: '', options: [{ _key: crypto.randomUUID(), name: '', price: '0,00' }] }])
   }
 
   // "Reaproveitar" copia só a ESTRUTURA (nome do grupo + nome das opções)
@@ -115,14 +151,14 @@ export default function ProductFormPage() {
   // sentido nesse sistema (não existe preço base pra variação somar —
   // o valor da opção É o preço final, então precisa ser digitado de
   // novo, específico pra cada produto).
-  const reaproveitarGrupo = (groupId) => {
-    if (!groupId) return
-    const grupo = (variantGroups || []).find((g) => g._id === groupId)
-    if (!grupo) return
+  const reaproveitarGrupo = (nomeGrupo) => {
+    if (!nomeGrupo) return
+    const template = (variantGroupTemplates || []).find((g) => g.name === nomeGrupo)
+    if (!template) return
     setGruposVariacao((gs) => [...gs, {
-      tempId: `reaproveitado-${Date.now()}`,
-      name: grupo.name,
-      options: grupo.options.map((o) => ({ name: o.name, price: '' })),
+      _key: crypto.randomUUID(),
+      name: template.name,
+      options: template.options.map((o) => ({ _key: crypto.randomUUID(), name: o.name, price: '' })),
     }])
   }
 
@@ -133,7 +169,7 @@ export default function ProductFormPage() {
   }
 
   const adicionarOpcao = (grupoIndex) => {
-    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: [...g.options, { name: '', price: '0,00' }] } : g)))
+    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: [...g.options, { _key: crypto.randomUUID(), name: '', price: '0,00' }] } : g)))
   }
 
   const atualizarOpcao = (grupoIndex, opcaoIndex, campo, valor) => {
@@ -148,7 +184,17 @@ export default function ProductFormPage() {
     setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: g.options.filter((_, j) => j !== opcaoIndex) } : g)))
   }
 
-  const gruposDisponiveisPraReaproveitar = variantGroups || []
+  // Reordena as opções DENTRO de um grupo — só afeta a exibição desse
+  // produto especificamente (variação é embutida no produto, nunca
+  // compartilhada), então arrastar aqui nunca cria nem edita nada em
+  // outro produto.
+  const reordenarOpcoes = (grupoIndex, opcoesReordenadas) => {
+    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: opcoesReordenadas } : g)))
+  }
+
+  const sensorsOpcoes = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  const gruposDisponiveisPraReaproveitar = variantGroupTemplates || []
 
   // ── Opcionais / Adicionais (inalterado) ─────────────────────────────
 
@@ -225,37 +271,21 @@ export default function ProductFormPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    let variantGroupIds = []
-    if (form.pricingMode === 'variants') {
-      // Cria os grupos NOVOS primeiro (os que ainda não têm _id), depois
-      // junta com os IDs dos que já existiam (reaproveitados)
-      for (const grupo of gruposVariacao) {
-        const payload = {
+    // Variação é só um CAMPO do produto agora — nada de chamada separada,
+    // nada de _id compartilhado. Salva junto no mesmo payload do produto.
+    const variantGroupsPayload = form.pricingMode === 'variants'
+      ? gruposVariacao.map((grupo) => ({
           name: grupo.name,
           options: grupo.options.map((o) => ({ name: o.name, price: toCents(String(o.price).replace(',', '.')) })),
-        }
-        if (grupo._id) {
-          // Grupo pertence a ESTE produto (veio do carregamento dele pra
-          // edição) — atualiza de verdade, senão a edição feita aqui nunca
-          // seria salva.
-          await updateVariantGroup.mutateAsync({ id: grupo._id, ...payload })
-          variantGroupIds.push(grupo._id)
-        } else {
-          // Novo — seja do zero, seja "reaproveitado" como modelo de nome
-          // (nesse caso o preço veio em branco, preenchido agora) — sempre
-          // cria um grupo próprio desse produto, nunca compartilhado.
-          const criado = await createVariantGroup.mutateAsync(payload)
-          variantGroupIds.push(criado.data.data._id)
-        }
-      }
-    }
+        }))
+      : []
 
     const payload = {
       name:        form.name,
       description: form.description,
       pricingMode: form.pricingMode,
       price:       form.pricingMode === 'simple' ? toCents(form.price) : 0,
-      variantGroupIds: form.pricingMode === 'variants' ? variantGroupIds : [],
+      variantGroups: variantGroupsPayload,
       category:    form.category,
       imageUrl:    form.imageBase64 ? null : (form.imageUrl || null),
       imageBase64: form.imageBase64 || null,
@@ -277,7 +307,7 @@ export default function ProductFormPage() {
     navigate('/products')
   }
 
-  const isSaving = createProduct.isPending || updateProduct.isPending || createVariantGroup.isPending || updateVariantGroup.isPending
+  const isSaving = createProduct.isPending || updateProduct.isPending
 
   return (
     <div>
@@ -360,7 +390,7 @@ export default function ProductFormPage() {
               <p className="text-xs text-gray-400">Você pode usar mais de um grupo neste produto.</p>
 
               {gruposVariacao.map((grupo, grupoIndex) => (
-                <div key={grupo._id || grupo.tempId} className="border border-gray-200 rounded-xl p-3 space-y-2">
+                <div key={grupo._key} className="border border-gray-200 rounded-xl p-3 space-y-2">
                   <div className="flex items-center gap-2">
                     <GripVertical size={14} className="text-gray-300 shrink-0" />
                     <input
@@ -375,25 +405,30 @@ export default function ProductFormPage() {
                   </div>
 
                   <div className="space-y-1.5 pl-5">
-                    {grupo.options.map((opcao, opcaoIndex) => (
-                      <div key={opcaoIndex} className="flex items-center gap-2">
-                        <input
-                          value={opcao.name}
-                          onChange={(e) => atualizarOpcao(grupoIndex, opcaoIndex, 'name', e.target.value)}
-                          placeholder="Nome da opção"
-                          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        />
-                        <input
-                          value={opcao.price}
-                          onChange={(e) => atualizarOpcao(grupoIndex, opcaoIndex, 'price', e.target.value)}
-                          placeholder="R$ 0,00"
-                          className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        />
-                        <button type="button" onClick={() => removerOpcao(grupoIndex, opcaoIndex)} className="text-gray-300 hover:text-danger shrink-0">
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
+                    <DndContext
+                      sensors={sensorsOpcoes}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => {
+                        const { active, over } = event
+                        if (!over || active.id === over.id) return
+                        const oldIndex = grupo.options.findIndex((o) => o._key === active.id)
+                        const newIndex = grupo.options.findIndex((o) => o._key === over.id)
+                        reordenarOpcoes(grupoIndex, arrayMove(grupo.options, oldIndex, newIndex))
+                      }}
+                    >
+                      <SortableContext items={grupo.options.map((o) => o._key)} strategy={verticalListSortingStrategy}>
+                        {grupo.options.map((opcao, opcaoIndex) => (
+                          <OpcaoArrastavel
+                            key={opcao._key}
+                            id={opcao._key}
+                            opcao={opcao}
+                            onChangeNome={(valor) => atualizarOpcao(grupoIndex, opcaoIndex, 'name', valor)}
+                            onChangePreco={(valor) => atualizarOpcao(grupoIndex, opcaoIndex, 'price', valor)}
+                            onRemover={() => removerOpcao(grupoIndex, opcaoIndex)}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                     <button type="button" onClick={() => adicionarOpcao(grupoIndex)} className="text-xs text-primary font-medium flex items-center gap-1">
                       <Plus size={12} /> Adicionar opção
                     </button>
@@ -417,7 +452,7 @@ export default function ProductFormPage() {
                     className="text-xs px-3 py-2 rounded-xl border border-primary/40 text-primary"
                   >
                     <option value="">Reaproveitar grupo...</option>
-                    {gruposDisponiveisPraReaproveitar.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)}
+                    {gruposDisponiveisPraReaproveitar.map((g) => <option key={g.name} value={g.name}>{g.name}</option>)}
                   </select>
                 )}
               </div>
