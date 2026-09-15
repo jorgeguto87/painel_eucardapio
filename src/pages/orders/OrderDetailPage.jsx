@@ -14,7 +14,7 @@ const PAYMENT_LABELS = {
   cash_on_delivery: 'Pagamento na entrega',
 }
 
-const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)' }
+const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)', voucher: 'Voucher (VR/VA, Ticket Alimentação)' }
 
 export default function OrderDetailPage() {
   const { id } = useParams()
