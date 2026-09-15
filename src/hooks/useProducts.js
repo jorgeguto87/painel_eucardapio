@@ -54,3 +54,68 @@ export const useDeleteProduct = () => {
     onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao remover'),
   })
 }
+
+export const useCreateCategory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name) => api.post('/products/categories', { name }),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Categoria criada!') },
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao criar categoria'),
+  })
+}
+
+// Reordena sem "piscar" a tela — atualiza a lista local na hora (optimistic
+// update), sem esperar o servidor confirmar. Se der erro, o React Query
+// naturalmente vai buscar de novo e corrigir a ordem na próxima sincronização.
+export const useReorderCategories = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (items) => api.patch('/products/categories/reorder', { items }),
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao reordenar'),
+    onSettled:  () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+export const useReorderProducts = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (items) => api.patch('/products/reorder', { items }),
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao reordenar'),
+    onSettled:  () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+// ── Grupos de variação ──────────────────────────────────────────────────
+
+export const useVariantGroups = () =>
+  useQuery({
+    queryKey: ['variant-groups'],
+    queryFn:  async () => (await api.get('/products/variant-groups')).data.data,
+  })
+
+export const useCreateVariantGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload) => api.post('/products/variant-groups', payload),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['variant-groups'] }); toast.success('Grupo de variação criado!') },
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao criar grupo'),
+  })
+}
+
+export const useUpdateVariantGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...payload }) => api.patch(`/products/variant-groups/${id}`, payload),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['variant-groups'] }),
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao atualizar grupo'),
+  })
+}
+
+export const useDeleteVariantGroup = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.delete(`/products/variant-groups/${id}`),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['variant-groups'] }); qc.invalidateQueries({ queryKey: ['products'] }) },
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao apagar grupo'),
+  })
+}
