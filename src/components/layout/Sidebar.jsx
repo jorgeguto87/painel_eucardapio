@@ -38,7 +38,7 @@ const handleLogoutClick = async () => {
         <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white font-bold">
           {restaurant?.name?.[0]?.toUpperCase() || 'E'}
         </div>
-        <span className="truncate font-bold text-secondary">{restaurant?.name || 'Eu Cardápio'}</span>
+        <span className="truncate font-bold text-secondary" translate="no">{restaurant?.name || 'Eu Cardápio'}</span>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-2">
