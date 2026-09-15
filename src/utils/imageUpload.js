@@ -2,7 +2,13 @@
 // Produtos, Configuração do bot e Banners — todos aceitam imagem via
 // upload (base64 salvo no Mongo) OU via URL externa.
 
-export const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024 // ~1.5MB (arquivo original)
+// Antes, esse limite era 1.5MB — bem menor que uma foto de celular
+// comum (3-8MB), então a imagem era rejeitada AQUI, antes mesmo de
+// chegar no backend (que já comprime de verdade, via sharp). Na prática,
+// isso fazia parecer que "a compressão não funcionava" — na real, a
+// imagem nunca passava daqui. Sobe o limite pra bater com o que o
+// backend de fato aceita (ver product.routes.js, MAX_BASE64_LENGTH).
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // ~10MB (arquivo original, antes da compressão)
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']
 
@@ -18,7 +24,7 @@ export function fileToBase64(file) {
       return reject(new Error('Formato não suportado. Use PNG, JPG, WEBP ou GIF.'))
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      return reject(new Error('Imagem muito grande. O limite é de 1.5MB.'))
+      return reject(new Error('Imagem muito grande. O limite é de 10MB.'))
     }
 
     const reader = new FileReader()
