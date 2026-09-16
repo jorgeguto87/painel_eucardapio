@@ -7,6 +7,16 @@
   html { -webkit-tap-highlight-color: transparent; }
   body { @apply bg-bg text-secondary font-sans; }
   * { -webkit-font-smoothing: antialiased; }
+
+  /* O reset padrão do Tailwind deixa o cursor de botão como "default" —
+     sem isso, nada parecia clicável de verdade (mesmo sendo). Aplica em
+     qualquer coisa clicável, exceto quando desabilitado. */
+  button:not(:disabled), [role="button"]:not(:disabled), a, select, summary {
+    cursor: pointer;
+  }
+  button:disabled, [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 @layer components {
