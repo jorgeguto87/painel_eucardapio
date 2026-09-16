@@ -64,6 +64,33 @@ export const useCreateCategory = () => {
   })
 }
 
+export const useUpdateCategory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, name }) => api.patch(`/products/categories/${id}`, { name }),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Categoria renomeada!') },
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao renomear categoria'),
+  })
+}
+
+export const useDeleteCategory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...payload }) => api.delete(`/products/categories/${id}`, { data: payload }),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Categoria apagada!') },
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao apagar categoria'),
+  })
+}
+
+export const useDuplicateProduct = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, categories }) => api.post(`/products/${id}/duplicate`, { categories }),
+    onSuccess:  () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Produto duplicado!') },
+    onError:    (err) => toast.error(err.response?.data?.error?.message || 'Erro ao duplicar produto'),
+  })
+}
+
 // Reordena sem "piscar" a tela — atualiza a lista local na hora (optimistic
 // update), sem esperar o servidor confirmar. Se der erro, o React Query
 // naturalmente vai buscar de novo e corrigir a ordem na próxima sincronização.
