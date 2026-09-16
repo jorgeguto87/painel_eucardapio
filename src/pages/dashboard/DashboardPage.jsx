@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingBag, DollarSign, Clock, MessageCircle, Bike, AlertTriangle, UtensilsCrossed } from 'lucide-react'
+import { ShoppingBag, DollarSign, Clock, MessageCircle, Bike, AlertTriangle, UtensilsCrossed, PlusCircle } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -10,7 +10,10 @@ import { useOrders } from '../../hooks/useOrders'
 import { useWhatsappStatus } from '../../hooks/useWhatsapp'
 import { useMyBilling } from '../../hooks/useBilling'
 import useRestaurantStore from '../../stores/restaurantStore'
+import useAuthStore from '../../stores/authStore'
 import { formatCurrency } from '../../utils/format'
+
+const CARDAPIO_URL = import.meta.env.VITE_CARDAPIO_URL || 'https://eucardapio.com.br'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -18,6 +21,17 @@ export default function DashboardPage() {
   const { data: ordersData, isLoading } = useOrders()
   const { data: whatsappStatus } = useWhatsappStatus()
   const { data: billingData } = useMyBilling()
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const refreshToken = useAuthStore((s) => s.refreshToken)
+
+  // Abre o cardápio numa aba nova, no modo balcão — leva a sessão atual
+  // do painel junto (pela URL, só na primeira carga), pra aquela aba já
+  // ter permissão de buscar/cadastrar cliente sem precisar logar de novo.
+  const abrirBalcao = () => {
+    if (!restaurant?.slug || !accessToken || !refreshToken) return
+    const url = `${CARDAPIO_URL}/r/${restaurant.slug}/balcao?at=${encodeURIComponent(accessToken)}&rt=${encodeURIComponent(refreshToken)}`
+    window.open(url, '_blank')
+  }
 
   useEffect(() => {
     if (!restaurant) fetchRestaurant()
@@ -51,6 +65,13 @@ export default function DashboardPage() {
 
       <div className="page space-y-4">
         <NoticeBanner />
+
+        <button
+          onClick={abrirBalcao}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-bold text-white shadow-[0_8px_20px_-8px_rgba(255,107,44,0.55)] cursor-pointer"
+        >
+          <PlusCircle size={18} /> Novo pedido — Balcão
+        </button>
 
         {/* Assinatura vencida/suspensa */}
         {(isPastDue || isSuspended) && (
