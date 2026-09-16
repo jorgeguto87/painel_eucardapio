@@ -234,6 +234,7 @@ export default function ReportsPage() {
     { v: undefined,  l: 'Todos os canais' },
     { v: 'delivery', l: 'Delivery' },
     { v: 'mesa',     l: 'Mesa' },
+    { v: 'balcao',   l: 'Balcão' },
   ]
 
   // Tela de detalhe do dia (nível final, alcançável a partir de qualquer aba)
