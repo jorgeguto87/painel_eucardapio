@@ -28,15 +28,24 @@ export default function OrderDetailPage() {
 
   const hasAddress = order.deliveryAddress?.street
   const isMesa = order.orderType === 'mesa'
+  const isBalcao = order.orderType === 'balcao'
+  const isBalcaoMesa = isBalcao && order.balcaoMode === 'mesa'
+  const isBalcaoAvulso = isBalcao && order.balcaoMode === 'avulso'
+  // Ciclo curto = sem entregador, restaurante marca "Concluído" na mão.
+  // Cobre mesa tradicional e as 2 submodalidades do balcão que não saem
+  // pra rua (mesa e avulso) — só balcão-entrega segue o ciclo completo,
+  // igual delivery normal, e isso já é resolvido sozinho por "hasAddress"
+  // mais abaixo (só balcão-entrega tem endereço preenchido).
+  const isCicloCurto = isMesa || isBalcaoMesa || isBalcaoAvulso
   const canCancel = !['finalizado', 'cancelado'].includes(order.status)
   // "Iniciar preparo" é manual mesmo pra pedido pago online — o status só
   // deve virar "preparo" quando a cozinha realmente começar, não assim que
   // o pagamento for confirmado (senão o cliente vê uma informação errada
   // sobre o andamento real do pedido).
   const canStartPreparing = ['recebido', 'pago'].includes(order.status)
-  // Mesa não tem entregador pra avançar sozinho até "finalizado" — o
-  // restaurante marca "Concluído" manualmente na hora de entregar na mesa.
-  const canFinishMesa = isMesa && order.status === 'preparo'
+  // Ciclo curto não tem entregador pra avançar sozinho até "finalizado" —
+  // o restaurante marca "Concluído" manualmente na hora de entregar.
+  const canFinishMesa = isCicloCurto && order.status === 'preparo'
 
   const handleCancel = () => {
     if (window.confirm('Cancelar este pedido? Essa ação não pode ser desfeita.')) {
@@ -131,7 +140,14 @@ export default function OrderDetailPage() {
           {order.deliveryPaymentMethod && (
             <p className="text-sm text-gray-500 mt-1">
               {DELIVERY_PAYMENT_LABELS[order.deliveryPaymentMethod]}
-              {order.paymentMethod === 'cash_on_delivery' && (isMesa ? ' — na mesa' : ' — na entrega')}
+              {order.paymentMethod === 'cash_on_delivery' && (
+                isCicloCurto ? ' — no balcão' : ' — na entrega'
+              )}
+            </p>
+          )}
+          {order.paidAtCreation && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">
+              ✅ Já pago no balcão
             </p>
           )}
           {order.changeRequested && (
@@ -142,14 +158,26 @@ export default function OrderDetailPage() {
           )}
         </Card>
 
-        {/* Mesa */}
-        {isMesa && (
+        {/* Mesa (tradicional ou balcão-mesa) */}
+        {(isMesa || isBalcaoMesa) && (
           <Card>
             <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
               <UtensilsCrossed size={16} className="text-primary" />
-              Mesa
+              {isBalcao ? 'Balcão — Mesa' : 'Mesa'}
             </h3>
             <p className="text-sm">Mesa {order.tableNumber}</p>
+            {order.customerName && <p className="text-sm text-gray-500 mt-1">{order.customerName}</p>}
+          </Card>
+        )}
+
+        {/* Balcão — avulso (aguarda e leva no balcão, sem mesa nem entrega) */}
+        {isBalcaoAvulso && (
+          <Card>
+            <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+              <UtensilsCrossed size={16} className="text-primary" />
+              Balcão — Retirada
+            </h3>
+            <p className="text-sm text-gray-500">Cliente aguarda e leva no balcão</p>
             {order.customerName && <p className="text-sm text-gray-500 mt-1">{order.customerName}</p>}
           </Card>
         )}
