@@ -115,13 +115,24 @@ export default function ProductFormPage() {
           opcionaisIds: (product.opcionaisIds || []).map((o) => o._id || o),
           adicionaisIds: (product.adicionaisIds || []).map((a) => a._id || a),
         })
-        if (product.variantGroups?.length) {
-          setGruposVariacao(product.variantGroups.map((g) => ({
+        // Sempre reseta (não só quando tem variação) — senão, navegando
+        // de um produto COM variação direto pra outro SEM, a lista antiga
+        // ficava grudada em memória, mesmo sem aparecer na tela na hora.
+        setGruposVariacao(
+          (product.variantGroups || []).map((g) => ({
             _key: crypto.randomUUID(), name: g.name,
             options: (g.options || []).map((o) => ({ _key: crypto.randomUUID(), name: o.name, price: formatarPrecoParaInput(o.price) })),
-          })))
-        }
+          }))
+        )
       }
+    } else if (!isEditing) {
+      // "Produto novo" — mesmo cuidado, pra quando se navega direto de
+      // editar um produto pra criar um novo, sem passar pela lista.
+      setForm({
+        name: '', description: '', price: '', category: 'Geral', imageUrl: '', imageBase64: '',
+        pricingMode: 'simple', opcionaisIds: [], adicionaisIds: [],
+      })
+      setGruposVariacao([])
     }
   }, [isEditing, grouped, id])
 
