@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus, ImageOff, SlidersHorizontal, Star, Image, QrCode, ChevronDown, GripVertical,
@@ -226,6 +226,11 @@ function CategoriaArrastavel({ categoria, produtos, expandida, onToggleExpandir,
 function MoverProdutoModal({ produto, categorias, onClose, onConfirmar, salvando }) {
   const [destino, setDestino] = useState('')
 
+  // Sem isso, a seleção de uma abertura anterior ficava "grudada" — o
+  // componente não é recriado do zero a cada vez que abre pra um produto
+  // diferente, só o prop muda. Reseta toda vez que muda de produto.
+  useEffect(() => { setDestino('') }, [produto?._id])
+
   if (!produto) return null
 
   return (
@@ -259,6 +264,12 @@ function MoverProdutoModal({ produto, categorias, onClose, onConfirmar, salvando
 
 function DuplicarProdutoModal({ produto, categorias, onClose, onConfirmar, salvando }) {
   const [selecionadas, setSelecionadas] = useState([])
+
+  // Mesmo problema, e é exatamente o bug que você reportou: sem isso, a
+  // categoria marcada numa duplicação anterior ficava selecionada pra
+  // sempre, mesmo sem aparecer marcada na tela, e ia junto em toda
+  // duplicação seguinte.
+  useEffect(() => { setSelecionadas([]) }, [produto?._id])
 
   if (!produto) return null
 
@@ -299,6 +310,14 @@ function ApagarCategoriaModal({ categoria, categorias, onClose, onConfirmar, sal
   const [modo, setModo] = useState(null) // null | 'coletivo' | 'individual'
   const [destinoColetivo, setDestinoColetivo] = useState('')
   const [destinosIndividuais, setDestinosIndividuais] = useState({}) // { produtoId: categoriaNome }
+
+  // Mesmo cuidado dos outros 2 modais — reseta tudo sempre que muda de
+  // categoria, senão escolha antiga fica grudada silenciosamente.
+  useEffect(() => {
+    setModo(null)
+    setDestinoColetivo('')
+    setDestinosIndividuais({})
+  }, [categoria?.name])
 
   if (!categoria) return null
 
