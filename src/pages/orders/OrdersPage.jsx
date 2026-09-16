@@ -21,6 +21,7 @@ const TYPE_TABS = [
   { value: '',         label: 'Todos os canais' },
   { value: 'delivery', label: 'Delivery' },
   { value: 'mesa',     label: 'Mesa' },
+  { value: 'balcao',   label: 'Balcão' },
 ]
 
 export default function OrdersPage() {
@@ -83,9 +84,16 @@ export default function OrdersPage() {
                       {order.orderType === 'mesa' && (
                         <span className="text-[10px] font-bold uppercase text-primary bg-primary/10 rounded-full px-1.5 py-0.5">Mesa {order.tableNumber}</span>
                       )}
+                      {order.orderType === 'balcao' && (
+                        <span className="text-[10px] font-bold uppercase text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                          Balcão{order.balcaoMode === 'mesa' ? ` · Mesa ${order.tableNumber}` : order.balcaoMode === 'entrega' ? ' · Entrega' : ' · Avulso'}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-gray-400 truncate">
-                      {order.orderType === 'mesa' ? (order.customerName || 'Cliente na mesa') : (order.customerName || order.customerPhone)}
+                      {(order.orderType === 'mesa' || (order.orderType === 'balcao' && order.balcaoMode !== 'entrega'))
+                        ? (order.customerName || 'Cliente no local')
+                        : (order.customerName || order.customerPhone)}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">{formatDateTime(order.createdAt)}</p>
                   </div>
