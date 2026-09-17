@@ -53,10 +53,12 @@ export default function DashboardPage() {
   const todayOrders = orders.filter((o) => new Date(o.createdAt).toDateString() === today)
   const openOrders = orders.filter((o) => !['finalizado', 'cancelado'].includes(o.status))
 
-  const todayDelivery = todayOrders.filter((o) => o.orderType !== 'mesa')
+  const todayDelivery = todayOrders.filter((o) => o.orderType === 'delivery')
+  const todayBalcao    = todayOrders.filter((o) => o.orderType === 'balcao')
   const todayMesa      = todayOrders.filter((o) => o.orderType === 'mesa')
   const revenueOf = (list) => list.filter((o) => o.status !== 'cancelado').reduce((sum, o) => sum + o.total, 0)
   const todayRevenueDelivery = revenueOf(todayDelivery)
+  const todayRevenueBalcao    = revenueOf(todayBalcao)
   const todayRevenueMesa      = revenueOf(todayMesa)
 
   return (
@@ -131,60 +133,72 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* Métricas do dia — divididas por canal, pra não misturar delivery com mesa */}
+        {/* Pedidos hoje — os 3 canais juntos, num cartão só, com divisória */}
+        <Card>
+          <p className="text-xs font-semibold text-gray-400 mb-3">Pedidos hoje</p>
+          <div className="grid grid-cols-3 divide-x divide-gray-100">
+            <div className="flex flex-col items-center gap-1 px-1 text-center">
+              <ShoppingBag size={15} className="text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Delivery</span>
+              <span className="text-lg font-bold text-secondary">{todayDelivery.length}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 px-1 text-center">
+              <PlusCircle size={15} className="text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Balcão</span>
+              <span className="text-lg font-bold text-secondary">{todayBalcao.length}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 px-1 text-center">
+              <UtensilsCrossed size={15} className="text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Mesa</span>
+              <span className="text-lg font-bold text-secondary">{todayMesa.length}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Faturamento hoje — mesmo padrão, clica e vai pro relatório */}
+        <Card onClick={() => navigate('/reports')}>
+          <p className="text-xs font-semibold text-gray-400 mb-3">Faturamento hoje</p>
+          <div className="grid grid-cols-3 divide-x divide-gray-100">
+            <div className="flex flex-col items-center gap-1 px-1 text-center">
+              <DollarSign size={15} className="text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Delivery</span>
+              <span className="text-xs font-bold text-secondary whitespace-nowrap">{formatCurrency(todayRevenueDelivery)}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 px-1 text-center">
+              <DollarSign size={15} className="text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Balcão</span>
+              <span className="text-xs font-bold text-secondary whitespace-nowrap">{formatCurrency(todayRevenueBalcao)}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1 px-1 text-center">
+              <DollarSign size={15} className="text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-400 leading-tight">Mesa</span>
+              <span className="text-xs font-bold text-secondary whitespace-nowrap">{formatCurrency(todayRevenueMesa)}</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Pedidos em aberto + Entregadores — lado a lado, mesma altura */}
         <div className="grid grid-cols-2 gap-3">
-          <Card>
+          <Card onClick={() => navigate('/orders')}>
             <div className="flex items-center gap-2 text-gray-400 mb-1">
-              <ShoppingBag size={16} />
-              <span className="text-xs font-medium">Pedidos hoje — Delivery</span>
+              <Clock size={16} />
+              <span className="text-xs font-medium">Em aberto</span>
             </div>
-            <p className="text-2xl font-bold text-secondary">{todayDelivery.length}</p>
+            <p className="text-2xl font-bold text-primary">{openOrders.length}</p>
           </Card>
 
-          <Card>
-            <div className="flex items-center gap-2 text-gray-400 mb-1">
-              <UtensilsCrossed size={16} />
-              <span className="text-xs font-medium">Pedidos hoje — Mesa</span>
+          <Card onClick={() => navigate('/deliverers')} className="flex flex-col justify-center">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Bike size={17} className="text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-sm text-secondary leading-tight">Entregadores</p>
+                <p className="text-[11px] text-gray-400 leading-tight">Filas e histórico</p>
+              </div>
             </div>
-            <p className="text-2xl font-bold text-secondary">{todayMesa.length}</p>
-          </Card>
-
-          <Card onClick={() => navigate('/reports')}>
-            <div className="flex items-center gap-2 text-gray-400 mb-1">
-              <DollarSign size={16} />
-              <span className="text-xs font-medium">Faturamento — Delivery</span>
-            </div>
-            <p className="text-2xl font-bold text-secondary">{formatCurrency(todayRevenueDelivery)}</p>
-          </Card>
-
-          <Card onClick={() => navigate('/reports')}>
-            <div className="flex items-center gap-2 text-gray-400 mb-1">
-              <DollarSign size={16} />
-              <span className="text-xs font-medium">Faturamento — Mesa</span>
-            </div>
-            <p className="text-2xl font-bold text-secondary">{formatCurrency(todayRevenueMesa)}</p>
           </Card>
         </div>
-
-        <Card onClick={() => navigate('/orders')}>
-          <div className="flex items-center gap-2 text-gray-400 mb-1">
-            <Clock size={16} />
-            <span className="text-xs font-medium">Pedidos em aberto</span>
-          </div>
-          <p className="text-2xl font-bold text-primary">{openOrders.length}</p>
-        </Card>
-
-        <Card onClick={() => navigate('/deliverers')}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Bike size={18} className="text-primary" />
-            </div>
-            <div>
-              <p className="font-medium text-sm">Entregadores</p>
-              <p className="text-xs text-gray-400">Filas de entrega e histórico</p>
-            </div>
-          </div>
-        </Card>
 
         {/* Últimos pedidos */}
         <div>
@@ -202,9 +216,18 @@ export default function DashboardPage() {
                         {order.orderType === 'mesa' && (
                           <span className="ml-1.5 text-[10px] font-bold uppercase text-primary bg-primary/10 rounded-full px-1.5 py-0.5">Mesa</span>
                         )}
+                        {order.orderType === 'balcao' && (
+                          <span className="ml-1.5 text-[10px] font-bold uppercase text-primary bg-primary/10 rounded-full px-1.5 py-0.5">
+                            Balcão{order.balcaoMode === 'mesa' ? ` · Mesa ${order.tableNumber}` : order.balcaoMode === 'entrega' ? '' : ' · Avulso'}
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {order.orderType === 'mesa' ? `Mesa ${order.tableNumber}` : order.customerPhone}
+                        {order.orderType === 'mesa'
+                          ? `Mesa ${order.tableNumber}`
+                          : (order.orderType === 'balcao' && order.balcaoMode !== 'entrega')
+                            ? (order.customerName || 'Cliente no local')
+                            : order.customerPhone}
                       </p>
                     </div>
                     <div className="text-right">
