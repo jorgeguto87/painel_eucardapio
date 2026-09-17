@@ -33,30 +33,90 @@ const formatarPrecoParaInput = (cents = 0) => (cents / 100).toFixed(2).replace('
 // Uma opção arrastável dentro de um grupo de variação — reordenar aqui só
 // afeta a ordem de exibição DESSE produto, nunca cria nem edita nenhum
 // registro compartilhado (variação não vive em coleção separada).
-function OpcaoArrastavel({ id, opcao, onChangeNome, onChangePreco, onRemover }) {
+function OpcaoArrastavel({ id, opcao, onChangeNome, onChangePreco, onRemover, opcionalGroups, onChangeOverrideRule }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  const [personalizando, setPersonalizando] = useState(false)
+
+  const overrides = opcao.opcionalRulesOverride || []
+  const getOverride = (catKey) => overrides.find((r) => r.categoryKey === catKey)
+  const temAlgumaPersonalizacao = overrides.length > 0
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
-      <button type="button" {...attributes} {...listeners} className="touch-none text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing shrink-0">
-        <GripVertical size={14} />
-      </button>
-      <input
-        value={opcao.name}
-        onChange={(e) => onChangeNome(e.target.value)}
-        placeholder="Nome da opção"
-        className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
-      />
-      <input
-        value={opcao.price}
-        onChange={(e) => onChangePreco(e.target.value)}
-        placeholder="R$ 0,00"
-        className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
-      />
-      <button type="button" onClick={onRemover} className="text-gray-300 hover:text-danger shrink-0">
-        <X size={14} />
-      </button>
+    <div ref={setNodeRef} style={style} className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <button type="button" {...attributes} {...listeners} className="touch-none text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing shrink-0">
+          <GripVertical size={14} />
+        </button>
+        <input
+          value={opcao.name}
+          onChange={(e) => onChangeNome(e.target.value)}
+          placeholder="Nome da opção"
+          className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        <input
+          value={opcao.price}
+          onChange={(e) => onChangePreco(e.target.value)}
+          placeholder="R$ 0,00"
+          className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        <button type="button" onClick={onRemover} className="text-gray-300 hover:text-danger shrink-0">
+          <X size={14} />
+        </button>
+      </div>
+
+      {opcionalGroups?.length > 0 && (
+        <div className="pl-5">
+          <button
+            type="button"
+            onClick={() => setPersonalizando((v) => !v)}
+            className={`text-[11px] font-medium underline underline-offset-2 ${temAlgumaPersonalizacao ? 'text-primary' : 'text-gray-400'}`}
+          >
+            {temAlgumaPersonalizacao ? 'Regra de opcionais personalizada ✓' : 'Personalizar quantos opcionais escolher pra esse tamanho'}
+          </button>
+
+          {personalizando && (
+            <div className="mt-1.5 space-y-1.5 bg-bg rounded-lg p-2">
+              {opcionalGroups.map((g) => {
+                const override = getOverride(g.key)
+                const usaPadrao = !override
+                return (
+                  <div key={g.key} className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-500 flex-1 truncate">{g.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (usaPadrao) onChangeOverrideRule(g.key, 'min', 1) // cria com valores iniciais
+                        else onChangeOverrideRule(g.key, null, null) // remove — volta a usar o padrão
+                      }}
+                      className={`text-[10px] px-2 py-1 rounded-full border ${usaPadrao ? 'border-gray-200 text-gray-400' : 'border-primary text-primary'}`}
+                    >
+                      {usaPadrao ? 'Usar padrão' : 'Específica'}
+                    </button>
+                    {!usaPadrao && (
+                      <>
+                        <input
+                          type="number" min="0" max="20"
+                          value={override.min}
+                          onChange={(e) => onChangeOverrideRule(g.key, 'min', Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-10 text-[11px] text-center px-1 py-1 rounded-lg border border-gray-200"
+                        />
+                        <span className="text-[10px] text-gray-400">a</span>
+                        <input
+                          type="number" min="1" max="20"
+                          value={override.max}
+                          onChange={(e) => onChangeOverrideRule(g.key, 'max', Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-10 text-[11px] text-center px-1 py-1 rounded-lg border border-gray-200"
+                        />
+                      </>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -88,7 +148,7 @@ export default function ProductFormPage() {
   const [form, setForm] = useState({
     name: '', description: '', price: '', category: 'Geral', imageUrl: '', imageBase64: '',
     pricingMode: 'simple',
-    opcionaisIds: [], adicionaisIds: [],
+    opcionaisIds: [], adicionaisIds: [], opcionalRules: [],
   })
 
   // Grupos de variação, montados localmente antes de salvar. Tem _id só
@@ -113,6 +173,7 @@ export default function ProductFormPage() {
           imageBase64: product.imageBase64 || '',
           pricingMode: product.pricingMode || 'simple',
           opcionaisIds: (product.opcionaisIds || []).map((o) => o._id || o),
+          opcionalRules: product.opcionalRules || [],
           adicionaisIds: (product.adicionaisIds || []).map((a) => a._id || a),
         })
         // Sempre reseta (não só quando tem variação) — senão, navegando
@@ -121,7 +182,10 @@ export default function ProductFormPage() {
         setGruposVariacao(
           (product.variantGroups || []).map((g) => ({
             _key: crypto.randomUUID(), name: g.name,
-            options: (g.options || []).map((o) => ({ _key: crypto.randomUUID(), name: o.name, price: formatarPrecoParaInput(o.price) })),
+            options: (g.options || []).map((o) => ({
+              _key: crypto.randomUUID(), name: o.name, price: formatarPrecoParaInput(o.price),
+              opcionalRulesOverride: o.opcionalRulesOverride || [],
+            })),
           }))
         )
       }
@@ -130,7 +194,7 @@ export default function ProductFormPage() {
       // editar um produto pra criar um novo, sem passar pela lista.
       setForm({
         name: '', description: '', price: '', category: 'Geral', imageUrl: '', imageBase64: '',
-        pricingMode: 'simple', opcionaisIds: [], adicionaisIds: [],
+        pricingMode: 'simple', opcionaisIds: [], adicionaisIds: [], opcionalRules: [],
       })
       setGruposVariacao([])
     }
@@ -187,6 +251,27 @@ export default function ProductFormPage() {
     setGruposVariacao((gs) => gs.map((g, i) => {
       if (i !== grupoIndex) return g
       const options = g.options.map((o, j) => (j === opcaoIndex ? { ...o, [campo]: valor } : o))
+      return { ...g, options }
+    }))
+  }
+
+  // campo/valor null,null = remove a personalização dessa categoria pra
+  // essa opção (volta a herdar a regra padrão do produto)
+  const atualizarOverrideOpcional = (grupoIndex, opcaoIndex, catKey, campo, valor) => {
+    setGruposVariacao((gs) => gs.map((g, i) => {
+      if (i !== grupoIndex) return g
+      const options = g.options.map((o, j) => {
+        if (j !== opcaoIndex) return o
+        const overridesAtuais = o.opcionalRulesOverride || []
+        if (campo === null) {
+          return { ...o, opcionalRulesOverride: overridesAtuais.filter((r) => r.categoryKey !== catKey) }
+        }
+        const existe = overridesAtuais.some((r) => r.categoryKey === catKey)
+        const opcionalRulesOverride = existe
+          ? overridesAtuais.map((r) => (r.categoryKey === catKey ? { ...r, [campo]: valor } : r))
+          : [...overridesAtuais, { categoryKey: catKey, min: 1, max: 1, [campo]: valor }]
+        return { ...o, opcionalRulesOverride }
+      })
       return { ...g, options }
     }))
   }
@@ -258,6 +343,20 @@ export default function ProductFormPage() {
     setForm((f) => ({ ...f, adicionaisIds: f.adicionaisIds.includes(adId) ? f.adicionaisIds.filter((x) => x !== adId) : [...f.adicionaisIds, adId] }))
   }
 
+  // Regra de "quantos escolher" por categoria de opcional — padrão do
+  // produto inteiro. Sem regra configurada, assume "escolha exatamente
+  // 1" (o comportamento de sempre, pra não afetar produto já existente).
+  const getRuleFor = (catKey) => form.opcionalRules.find((r) => r.categoryKey === catKey) || { min: 1, max: 1 }
+  const setRuleFor = (catKey, campo, valor) => {
+    setForm((f) => {
+      const existe = f.opcionalRules.some((r) => r.categoryKey === catKey)
+      const opcionalRules = existe
+        ? f.opcionalRules.map((r) => (r.categoryKey === catKey ? { ...r, [campo]: valor } : r))
+        : [...f.opcionalRules, { categoryKey: catKey, min: 1, max: 1, [campo]: valor }]
+      return { ...f, opcionalRules }
+    })
+  }
+
   const applyFavorito = (favId) => {
     const fav = (favoritos || []).find((f) => f._id === favId)
     if (!fav) return
@@ -287,7 +386,11 @@ export default function ProductFormPage() {
     const variantGroupsPayload = form.pricingMode === 'variants'
       ? gruposVariacao.map((grupo) => ({
           name: grupo.name,
-          options: grupo.options.map((o) => ({ name: o.name, price: toCents(String(o.price).replace(',', '.')) })),
+          options: grupo.options.map((o) => ({
+            name: o.name,
+            price: toCents(String(o.price).replace(',', '.')),
+            ...(o.opcionalRulesOverride?.length ? { opcionalRulesOverride: o.opcionalRulesOverride } : {}),
+          })),
         }))
       : []
 
@@ -301,6 +404,7 @@ export default function ProductFormPage() {
       imageUrl:    form.imageBase64 ? null : (form.imageUrl || null),
       imageBase64: form.imageBase64 || null,
       opcionaisIds: form.opcionaisIds,
+      opcionalRules: form.opcionalRules,
       adicionaisIds: form.adicionaisIds,
     }
 
@@ -436,6 +540,8 @@ export default function ProductFormPage() {
                             onChangeNome={(valor) => atualizarOpcao(grupoIndex, opcaoIndex, 'name', valor)}
                             onChangePreco={(valor) => atualizarOpcao(grupoIndex, opcaoIndex, 'price', valor)}
                             onRemover={() => removerOpcao(grupoIndex, opcaoIndex)}
+                            opcionalGroups={opcionalGroups}
+                            onChangeOverrideRule={(catKey, campo, valor) => atualizarOverrideOpcional(grupoIndex, opcaoIndex, catKey, campo, valor)}
                           />
                         ))}
                       </SortableContext>
@@ -526,7 +632,27 @@ export default function ProductFormPage() {
                         <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {isOpen && (
-                        <div className="p-3 space-y-2 border-t border-gray-100">
+                        <div className="p-3 space-y-3 border-t border-gray-100">
+                          <div className="flex items-center gap-3 bg-bg rounded-lg px-3 py-2">
+                            <span className="text-xs text-gray-500 shrink-0">Cliente escolhe:</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-gray-400">de</span>
+                              <input
+                                type="number" min="0" max="20"
+                                value={getRuleFor(group.key).min}
+                                onChange={(e) => setRuleFor(group.key, 'min', Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-12 text-xs text-center px-1 py-1 rounded-lg border border-gray-200"
+                              />
+                              <span className="text-[11px] text-gray-400">até</span>
+                              <input
+                                type="number" min="1" max="20"
+                                value={getRuleFor(group.key).max}
+                                onChange={(e) => setRuleFor(group.key, 'max', Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-12 text-xs text-center px-1 py-1 rounded-lg border border-gray-200"
+                              />
+                              <span className="text-[11px] text-gray-400">item(ns)</span>
+                            </div>
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             {group.items.map((o) => (
                               <button key={o._id} type="button" onClick={() => toggleOpcional(o._id)}
