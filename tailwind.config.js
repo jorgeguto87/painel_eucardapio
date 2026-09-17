@@ -11,6 +11,14 @@ export default {
         danger:    '#EF4444',
         surface:   '#FFFFFF',
         bg:        '#F8F9FA',
+        // O cinza padrão do Tailwind (usado em texto secundário, alça de
+        // arrastar, borda pontilhada etc.) é claro demais pra ler
+        // confortavelmente — escurece só esses 2 tons, mantendo 300 mais
+        // claro que 400 (a mesma hierarquia de sempre, só mais legível).
+        gray: {
+          300: '#9CA3AF', // era #D1D5DB
+          400: '#6B7280', // era #9CA3AF
+        },
       },
       fontFamily: { sans: ['Inter', 'sans-serif'] },
       borderRadius: { xl: '12px', '2xl': '16px' },
