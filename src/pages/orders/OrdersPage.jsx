@@ -96,6 +96,11 @@ export default function OrdersPage() {
                         : (order.customerName || order.customerPhone)}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">{formatDateTime(order.createdAt)}</p>
+                    {order.paymentMethod === 'pix_manual' && order.status === 'recebido' && (
+                      <p className="text-[10px] font-bold uppercase text-amber-600 bg-warning/10 rounded-full px-1.5 py-0.5 inline-block mt-1">
+                        🔑 Pix com chave{order.manualPixProofReceivedAt ? ' · comprovante enviado' : ''}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className="font-semibold text-sm mb-1.5">{formatCurrency(order.total)}</p>
