@@ -1,17 +1,17 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, FileText, Ban, ChefHat, UtensilsCrossed, CheckCircle2 } from 'lucide-react'
+import { MapPin, FileText, Ban, ChefHat, UtensilsCrossed, CheckCircle2, KeyRound, Paperclip } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DeliveryAssigner from '../../components/orders/DeliveryAssigner'
-import { useOrder, useCancelOrder, useUpdateOrderStatus } from '../../hooks/useOrders'
+import { useOrder, useCancelOrder, useUpdateOrderStatus, useConfirmManualPix } from '../../hooks/useOrders'
 import { formatCurrency, formatShortId, formatDateTime } from '../../utils/format'
 
 const PAYMENT_LABELS = {
   pix: 'PIX', credit_card: 'Cartão de crédito (online)', debit_card: 'Cartão de débito (online)',
-  cash_on_delivery: 'Pagamento na entrega',
+  cash_on_delivery: 'Pagamento na entrega', pix_manual: 'Pix com chave',
 }
 
 const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)', voucher: 'Voucher (VR/VA, Ticket Alimentação)' }
@@ -22,6 +22,7 @@ export default function OrderDetailPage() {
   const { data: order, isLoading } = useOrder(id)
   const cancelOrder = useCancelOrder()
   const updateStatus = useUpdateOrderStatus()
+  const confirmManualPix = useConfirmManualPix()
 
   if (isLoading) return <LoadingSpinner />
   if (!order) return <p className="page text-center text-gray-400">Pedido não encontrado.</p>
@@ -46,6 +47,11 @@ export default function OrderDetailPage() {
   // Ciclo curto não tem entregador pra avançar sozinho até "finalizado" —
   // o restaurante marca "Concluído" manualmente na hora de entregar.
   const canFinishMesa = isCicloCurto && order.status === 'preparo'
+  // Pix avulso — enquanto o pedido está "recebido", ainda não teve o
+  // pagamento confirmado pelo restaurante (não tem gateway pra confirmar
+  // sozinho). O bot pode ter marcado que o cliente já mandou o comprovante,
+  // mas quem decide de fato é o restaurante, clicando em "Confirmar pagamento".
+  const isAwaitingManualPix = order.paymentMethod === 'pix_manual' && order.status === 'recebido'
 
   const handleCancel = () => {
     if (window.confirm('Cancelar este pedido? Essa ação não pode ser desfeita.')) {
@@ -67,6 +73,17 @@ export default function OrderDetailPage() {
         */}
         <div className="flex items-center justify-between">
           <Badge status={order.status} />
+          {isAwaitingManualPix && (
+            <Button
+              variant="primary"
+              className="!min-h-0 !h-9 !px-4 text-sm"
+              loading={confirmManualPix.isPending}
+              onClick={() => confirmManualPix.mutate(order._id)}
+            >
+              <KeyRound size={15} />
+              Confirmar pagamento
+            </Button>
+          )}
           {canStartPreparing && (
             <Button
               variant="primary"
@@ -154,6 +171,28 @@ export default function OrderDetailPage() {
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">
               ✅ Já pago no balcão
             </p>
+          )}
+          {order.paymentMethod === 'pix_manual' && (
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-gray-500">
+                <span className="font-semibold">Chave:</span> {order.manualPixKeySnapshot || '—'}
+              </p>
+              {isAwaitingManualPix ? (
+                <p className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-amber-600">
+                  🔑 Aguardando confirmação
+                </p>
+              ) : (
+                <p className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">
+                  ✅ Pagamento confirmado
+                </p>
+              )}
+              {order.manualPixProofReceivedAt && (
+                <p className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Paperclip size={13} />
+                  Comprovante enviado pelo cliente em {formatDateTime(order.manualPixProofReceivedAt)}
+                </p>
+              )}
+            </div>
           )}
           {order.changeRequested && (
             <div className="mt-2 bg-warning/10 rounded-xl p-3 text-sm">
