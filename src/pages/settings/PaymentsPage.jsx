@@ -33,6 +33,10 @@ const METHOD_TOGGLES = [
   { key: 'acceptsDebitCard',      label: 'Cartão de débito (online)' },
   { key: 'acceptsCashOnDelivery', label: 'Pagar na entrega' },
   { key: 'acceptsCardOnDelivery', label: 'Maquininha na entrega' },
+  // Pix avulso — chave digitada manualmente pelo restaurante, confirmação
+  // de pagamento manual (sem gateway). Disponível pro cliente em delivery
+  // e mesa, nunca em balcão.
+  { key: 'acceptsManualPix',      label: 'PIX avulso (chave manual)' },
 ]
 
 const PROVIDERS = [
@@ -140,12 +144,18 @@ export default function PaymentsPage() {
   const toggle = (key) => setForm((f) => ({ ...f, [key]: !f[key] }))
 
   const handleSave = () => {
+    if (form.acceptsManualPix && !(form.manualPixKeyInput ?? form.manualPixKey)?.trim()) {
+      return toast.error('Informe a chave PIX para ativar o PIX avulso.')
+    }
+
     update.mutate({
       acceptsPix:            form.acceptsPix,
       acceptsCreditCard:     form.acceptsCreditCard,
       acceptsDebitCard:      form.acceptsDebitCard,
       acceptsCashOnDelivery: form.acceptsCashOnDelivery,
       acceptsCardOnDelivery: form.acceptsCardOnDelivery,
+      acceptsManualPix:      form.acceptsManualPix,
+      manualPixKey:          (form.manualPixKeyInput ?? form.manualPixKey ?? '').trim() || null,
       deliveryFee:           toCents(form.deliveryFeeInput ?? toReais(form.deliveryFee)),
       freeDeliveryAbove:     form.freeDeliveryAboveInput
         ? toCents(form.freeDeliveryAboveInput)
@@ -254,6 +264,21 @@ export default function PaymentsPage() {
               </div>
             ))}
           </div>
+
+          {form.acceptsManualPix && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <Input
+                label="Chave PIX"
+                placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
+                defaultValue={form.manualPixKey || ''}
+                onChange={(e) => setForm((f) => ({ ...f, manualPixKeyInput: e.target.value }))}
+              />
+              <p className="text-xs text-gray-400 mt-1.5">
+                Essa chave é mostrada ao cliente que escolher "Pix com chave" no delivery e na mesa. A confirmação do
+                pagamento é manual — você confere o comprovante e confirma no próprio pedido.
+              </p>
+            </div>
+          )}
         </Card>
 
         <Card>
