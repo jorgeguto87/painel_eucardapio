@@ -39,6 +39,24 @@ export const useUpdateOrderStatus = () => {
 }
 
 /**
+ * Confirma manualmente o pagamento de um pedido Pix avulso — depois que o
+ * restaurante conferiu o comprovante (recebido por fora ou sinalizado pelo
+ * bot no próprio pedido). Credita cashback e métricas do cliente, igual
+ * pagamento online aprovado.
+ */
+export const useConfirmManualPix = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id) => api.patch(`/orders/${id}/confirm-manual-pix`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      toast.success('Pagamento confirmado!')
+    },
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Erro ao confirmar pagamento'),
+  })
+}
+
+/**
  * Cancela o pedido — usado, por exemplo, quando o cliente pede cancelamento
  * numa conversa com o atendente.
  */
