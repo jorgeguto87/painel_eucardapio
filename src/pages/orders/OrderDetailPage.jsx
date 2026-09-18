@@ -101,6 +101,11 @@ export default function OrderDetailPage() {
                   <span>{item.quantity}x {item.name}</span>
                   <span className="font-medium">{formatCurrency(item.subtotal)}</span>
                 </div>
+                {item.chosenVariants?.length > 0 && (
+                  <p className="text-xs font-semibold text-secondary mt-0.5 pl-3">
+                    {item.chosenVariants.map((v) => `${v.groupName}: ${v.optionName}`).join(' · ')}
+                  </p>
+                )}
                 {item.chosenOpcionais?.length > 0 && (
                   <p className="text-xs text-gray-500 mt-0.5 pl-3">
                     Opcionais: {item.chosenOpcionais.map((o) => o.name).join(', ')}
