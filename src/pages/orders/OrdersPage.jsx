@@ -9,6 +9,8 @@ import OrderDetailModal from '../../components/orders/OrderDetailModal'
 import DeliveryQueueModal from '../../components/orders/DeliveryQueueModal'
 import HistoryModal from '../../components/orders/HistoryModal'
 
+//buildfix
+
 const BOARD_COLUMNS = [
   { status: 'recebido', label: 'Recebido' },
   { status: 'preparo',  label: 'Preparo' },
