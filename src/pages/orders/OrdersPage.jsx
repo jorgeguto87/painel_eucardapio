@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Printer } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useOrders } from '../../hooks/useOrders'
+import { usePrintAgentStatus, useSetAutoPrintRoles, PRINTER_ROLE_LABELS } from '../../hooks/usePrintAgent'
 import { formatCurrency, formatShortId, formatDateTime } from '../../utils/format'
 
 const TABS = [
@@ -24,6 +26,47 @@ const TYPE_TABS = [
   { value: 'balcao',   label: 'Balcão' },
 ]
 
+/**
+ * Atalho rápido pra ligar/desligar a impressão automática por impressora —
+ * muda com frequência (às vezes só usa uma ou duas no dia), por isso fica
+ * no topo dos Pedidos e não em Configurações (que é setup raro).
+ */
+function AutoPrintBar() {
+  const { data: status } = usePrintAgentStatus()
+  const setAutoPrint = useSetAutoPrintRoles()
+
+  if (!status?.isLinked || !status.printers?.length) return null
+
+  const activeRoles = status.autoPrintRoles || []
+
+  const toggleRole = (role) => {
+    const next = activeRoles.includes(role)
+      ? activeRoles.filter((r) => r !== role)
+      : [...activeRoles, role]
+    setAutoPrint.mutate(next)
+  }
+
+  return (
+    <div className="px-4 pb-2 max-w-lg mx-auto">
+      <div className="flex items-center gap-2 bg-surface border border-gray-100 rounded-xl px-3 py-2 overflow-x-auto scrollbar-hide">
+        <Printer size={14} className="text-gray-400 flex-shrink-0" />
+        <span className="text-[11px] font-medium text-gray-400 flex-shrink-0">Impressão automática:</span>
+        {status.printers.map((p) => (
+          <label key={p.role} className="flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={activeRoles.includes(p.role)}
+              onChange={() => toggleRole(p.role)}
+              className="rounded accent-primary"
+            />
+            <span className="text-xs font-medium">{PRINTER_ROLE_LABELS[p.role] || p.role}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function OrdersPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('')
@@ -38,6 +81,8 @@ export default function OrdersPage() {
 
       {/* Tipo de pedido — mesa e delivery são bem diferentes, melhor não misturar visualmente */}
       <div className="sticky top-14 z-20 bg-bg pt-2">
+        <AutoPrintBar />
+
         <div className="flex gap-2 overflow-x-auto px-4 pb-2 max-w-lg mx-auto scrollbar-hide">
           {TYPE_TABS.map((t) => (
             <button
