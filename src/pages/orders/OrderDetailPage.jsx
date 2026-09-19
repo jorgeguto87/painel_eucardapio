@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { MapPin, FileText, Ban, ChefHat, UtensilsCrossed, CheckCircle2, KeyRound, Paperclip } from 'lucide-react'
+import { MapPin, FileText, Ban, ChefHat, UtensilsCrossed, CheckCircle2, KeyRound, Paperclip, Printer } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DeliveryAssigner from '../../components/orders/DeliveryAssigner'
 import { useOrder, useCancelOrder, useUpdateOrderStatus, useConfirmManualPix } from '../../hooks/useOrders'
+import { usePrintAgentStatus, usePrintOrder, PRINTER_ROLE_LABELS } from '../../hooks/usePrintAgent'
 import { formatCurrency, formatShortId, formatDateTime } from '../../utils/format'
 
 const PAYMENT_LABELS = {
@@ -16,6 +19,44 @@ const PAYMENT_LABELS = {
 
 const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)', voucher: 'Voucher (VR/VA, Ticket Alimentação)' }
 
+/**
+ * Checklist de reimpressão — uma ou mais impressoras cadastradas, pra
+ * cobrir tanto "perdeu a via do balcão" (só uma) quanto "reimprimir tudo".
+ */
+function ReprintModal({ open, onClose, orderId, printers }) {
+  const [selected, setSelected] = useState([])
+  const printOrder = usePrintOrder()
+
+  const toggle = (role) => {
+    setSelected((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]))
+  }
+
+  const handleConfirm = () => {
+    printOrder.mutate({ orderId, roles: selected }, { onSuccess: () => { onClose(); setSelected([]) } })
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Reimprimir pedido">
+      <div className="space-y-2 mb-4">
+        {printers.map((p) => (
+          <label key={p.role} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-gray-100 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selected.includes(p.role)}
+              onChange={() => toggle(p.role)}
+              className="rounded accent-primary"
+            />
+            <span className="text-sm font-medium">{PRINTER_ROLE_LABELS[p.role] || p.role}</span>
+          </label>
+        ))}
+      </div>
+      <Button full disabled={selected.length === 0} loading={printOrder.isPending} onClick={handleConfirm}>
+        Imprimir
+      </Button>
+    </Modal>
+  )
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -23,6 +64,8 @@ export default function OrderDetailPage() {
   const cancelOrder = useCancelOrder()
   const updateStatus = useUpdateOrderStatus()
   const confirmManualPix = useConfirmManualPix()
+  const { data: printStatus } = usePrintAgentStatus()
+  const [reprintOpen, setReprintOpen] = useState(false)
 
   if (isLoading) return <LoadingSpinner />
   if (!order) return <p className="page text-center text-gray-400">Pedido não encontrado.</p>
@@ -266,6 +309,14 @@ export default function OrderDetailPage() {
           </Card>
         )}
 
+        {/* Reimprimir — só aparece se houver programinha pareado com impressoras cadastradas */}
+        {printStatus?.isLinked && printStatus.printers?.length > 0 && (
+          <Button full variant="secondary" onClick={() => setReprintOpen(true)}>
+            <Printer size={16} />
+            Reimprimir
+          </Button>
+        )}
+
         {/* Cancelar pedido */}
         {canCancel && (
           <Button
@@ -280,6 +331,15 @@ export default function OrderDetailPage() {
           </Button>
         )}
       </div>
+
+      {printStatus?.printers?.length > 0 && (
+        <ReprintModal
+          open={reprintOpen}
+          onClose={() => setReprintOpen(false)}
+          orderId={order._id}
+          printers={printStatus.printers}
+        />
+      )}
     </div>
   )
 }
