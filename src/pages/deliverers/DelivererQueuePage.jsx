@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronUp, ChevronDown, Send, ArrowRightLeft, X, MapPin } from 'lucide-react'
+import { Send, ArrowRightLeft, X, MapPin, GripVertical } from 'lucide-react'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -23,6 +30,48 @@ const STAGE_COLORS = {
   no_local: 'bg-success/10 text-success',
 }
 
+// Mesmo padrão de arrastar-e-soltar já usado em Produtos (dnd-kit + alça de
+// pontinhos) — equaliza a interação em vez de usar setinhas aqui.
+function QueueOrderCard({ order, onOpen, onTransfer, onRemove, removePending }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: order._id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className="!p-3">
+        <div className="flex items-start gap-2">
+          <button {...attributes} {...listeners} className="touch-none text-gray-300 hover:text-gray-400 shrink-0 cursor-grab active:cursor-grabbing mt-1">
+            <GripVertical size={16} />
+          </button>
+          <button onClick={onOpen} className="flex-1 text-left min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold text-sm">#{formatShortId(order._id)}</span>
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${STAGE_COLORS[order.deliveryStatus] || 'bg-gray-100 text-gray-500'}`}>
+                {STAGE_LABELS[order.deliveryStatus] || order.deliveryStatus}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <MapPin size={11} />
+              {order.deliveryAddress?.street}, {order.deliveryAddress?.number}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(order.total)}</p>
+          </button>
+        </div>
+
+        <div className="flex gap-2 mt-2 pt-2 border-t border-gray-50">
+          <Button variant="ghost" className="!min-h-0 !h-8 !px-2 text-xs flex-1" onClick={onTransfer}>
+            <ArrowRightLeft size={13} />
+            Transferir
+          </Button>
+          <Button variant="ghost" className="!min-h-0 !h-8 !px-2 text-xs text-danger" loading={removePending} onClick={onRemove}>
+            <X size={13} />
+          </Button>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 export default function DelivererQueuePage() {
   const { delivererId } = useParams()
   const navigate = useNavigate()
@@ -34,17 +83,16 @@ export default function DelivererQueuePage() {
   const removeDeliverer   = useRemoveDeliverer()
 
   const [transferTarget, setTransferTarget] = useState(null) // orderId sendo transferido
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const deliverer = deliverers?.find((d) => d._id === delivererId)
   const otherDeliverers = (deliverers || []).filter((d) => d._id !== delivererId && d.isActive !== false)
 
-  const move = (index, direction) => {
-    if (!orders) return
-    const newIndex = index + direction
-    if (newIndex < 0 || newIndex >= orders.length) return
-
-    const reordered = [...orders]
-    ;[reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]]
+  const handleDragEnd = ({ active, over }) => {
+    if (!orders || !over || active.id === over.id) return
+    const oldIndex = orders.findIndex((o) => o._id === active.id)
+    const newIndex = orders.findIndex((o) => o._id === over.id)
+    const reordered = arrayMove(orders, oldIndex, newIndex)
     reorderQueue.mutate({ delivererId, orderIds: reordered.map((o) => o._id) })
   }
 
@@ -70,70 +118,26 @@ export default function DelivererQueuePage() {
             Nenhuma entrega na fila desse entregador ainda.
           </p>
         ) : (
-          <div className="space-y-2">
-            {orders.map((order, index) => (
-              <Card key={order._id} className="!p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <button
-                    onClick={() => navigate(`/orders/${order._id}`)}
-                    className="flex-1 text-left min-w-0"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-sm">#{formatShortId(order._id)}</span>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${STAGE_COLORS[order.deliveryStatus] || 'bg-gray-100 text-gray-500'}`}>
-                        {STAGE_LABELS[order.deliveryStatus] || order.deliveryStatus}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                      <MapPin size={11} />
-                      {order.deliveryAddress?.street}, {order.deliveryAddress?.number}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(order.total)}</p>
-                  </button>
-
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => move(index, -1)}
-                      disabled={index === 0}
-                      className="p-1.5 rounded-lg bg-bg disabled:opacity-30"
-                    >
-                      <ChevronUp size={14} />
-                    </button>
-                    <button
-                      onClick={() => move(index, 1)}
-                      disabled={index === orders.length - 1}
-                      className="p-1.5 rounded-lg bg-bg disabled:opacity-30"
-                    >
-                      <ChevronDown size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-2 pt-2 border-t border-gray-50">
-                  <Button
-                    variant="ghost"
-                    className="!min-h-0 !h-8 !px-2 text-xs flex-1"
-                    onClick={() => setTransferTarget(order._id)}
-                  >
-                    <ArrowRightLeft size={13} />
-                    Transferir
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="!min-h-0 !h-8 !px-2 text-xs text-danger"
-                    loading={removeDeliverer.isPending}
-                    onClick={() => {
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orders.map((o) => o._id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {orders.map((order) => (
+                  <QueueOrderCard
+                    key={order._id}
+                    order={order}
+                    onOpen={() => navigate(`/orders/${order._id}`)}
+                    onTransfer={() => setTransferTarget(order._id)}
+                    removePending={removeDeliverer.isPending}
+                    onRemove={() => {
                       if (window.confirm('Remover esse pedido da fila? (não transfere pra ninguém)')) {
                         removeDeliverer.mutate(order._id)
                       }
                     }}
-                  >
-                    <X size={13} />
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
