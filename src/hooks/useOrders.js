@@ -182,11 +182,19 @@ export const useReorderQueue = () => {
 
 /**
  * Envia (ou reenvia) a lista numerada de entregas por WhatsApp pro entregador.
+ * Invalida a lista de entregadores também — o status dele (ex.: vira
+ * "em_rota") só reflete na tela na hora se essa consulta for atualizada
+ * junto, e não só a da fila.
  */
 export const useSendDelivererQueue = () => {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: (delivererId) => api.post(`/orders/queue/${delivererId}/send`),
-    onSuccess: (res) => toast.success(`Lista enviada! (${res.data.data.ordersCount} pedido(s))`),
+    onSuccess: (res, delivererId) => {
+      qc.invalidateQueries({ queryKey: ['deliverers'] })
+      qc.invalidateQueries({ queryKey: ['deliverer-queue', delivererId] })
+      toast.success(`Lista enviada! (${res.data.data.ordersCount} pedido(s))`)
+    },
     onError: (err) => toast.error(err.response?.data?.error?.message || 'Erro ao enviar lista'),
   })
 }
