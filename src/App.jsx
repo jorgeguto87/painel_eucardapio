@@ -25,6 +25,7 @@ import BannersPage from './pages/settings/BannersPage'
 import OfertasPage from './pages/settings/OfertasPage'
 import BusinessHoursPage from './pages/settings/BusinessHoursPage'
 import PaymentsPage from './pages/settings/PaymentsPage'
+import PrintersPage from './pages/settings/PrintersPage'
 import DeliverersPage from './pages/settings/DeliverersPage'
 import TeamPage from './pages/settings/TeamPage'
 import MyProfilePage from './pages/settings/MyProfilePage'
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="/settings/bot" element={<RequireAdmin><BotConfigPage /></RequireAdmin>} />
             <Route path="/settings/hours" element={<BusinessHoursPage />} />
             <Route path="/settings/payments" element={<RequireAdmin><PaymentsPage /></RequireAdmin>} />
+            <Route path="/settings/printers" element={<RequireAdmin><PrintersPage /></RequireAdmin>} />
             <Route path="/settings/deliverers" element={<DeliverersPage />} />
             <Route path="/settings/team" element={<RequireAdmin><TeamPage /></RequireAdmin>} />
             <Route path="/settings/my-profile" element={<MyProfilePage />} />
