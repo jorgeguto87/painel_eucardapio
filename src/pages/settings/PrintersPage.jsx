@@ -66,7 +66,7 @@ export default function PrintersPage() {
           </div>
           <p className="text-xs text-gray-400 mb-3">
             Um programinha pra instalar no computador do restaurante — conecta até 3 impressoras
-            (Balcão, Cozinha e Entrega) e imprime os pedidos automaticamente ou sob demanda.
+            (Balcão, Cozinha e Entrega) e imprime os pedidos automaticamente ou sob demanda. *Obs: Atualmente disponível somente para Windows.
           </p>
           <a href={DOWNLOAD_URL} target="_blank" rel="noreferrer">
             <Button full variant="secondary">
