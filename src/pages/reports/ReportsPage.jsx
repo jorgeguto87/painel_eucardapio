@@ -103,7 +103,7 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 function EvolucaoChart({ periods, seriesB, labelA, labelB }) {
-  if (!periods || periods.length < 2) return null
+  if (!Array.isArray(periods) || periods.length < 2) return null
   const data = periods.map((p, i) => ({
     label: p.label,
     a: p.total,
@@ -186,7 +186,7 @@ function SeletorPeriodo({ orderType, onPick }) {
         }}>
           Ver mês completo
         </Button>
-        {loadingWeeks ? <LoadingSpinner /> : !weeks || weeks.length === 0 ? (
+        {loadingWeeks ? <LoadingSpinner /> : !Array.isArray(weeks) || weeks.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">Nenhum pedido neste mês.</p>
         ) : (
           <Card>
@@ -312,7 +312,7 @@ function useDadosPeriodo(periodo, orderType) {
 }
 
 function PaymentBreakdownCard({ paymentMethods, total }) {
-  if (!paymentMethods || paymentMethods.length === 0) {
+  if (!Array.isArray(paymentMethods) || paymentMethods.length === 0) {
     return <Card><p className="text-sm text-gray-400 text-center py-4">Nenhum pagamento neste período.</p></Card>
   }
   return (
@@ -339,7 +339,7 @@ function PaymentBreakdownCard({ paymentMethods, total }) {
 }
 
 function ProductsCard({ products, title = 'Produtos mais vendidos' }) {
-  if (!products || products.length === 0) {
+  if (!Array.isArray(products) || products.length === 0) {
     return <Card><p className="text-sm text-gray-400 text-center py-4">Nenhum produto vendido neste período.</p></Card>
   }
   return (
@@ -367,7 +367,7 @@ function DeliverersCard({ deliverers }) {
   return (
     <Card>
       <p className="text-xs font-medium text-gray-400 mb-3">Taxa de entrega por entregador</p>
-      {!deliverers || deliverers.length === 0 ? (
+      {!Array.isArray(deliverers) || deliverers.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-4">Nenhuma entrega neste período.</p>
       ) : (
         <div className="space-y-2">
