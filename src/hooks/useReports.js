@@ -26,7 +26,7 @@ export const useDelivererRevenueReport = (period, orderType, from, to) =>
     queryKey: ['reports', 'revenue-deliverers', period, orderType, from, to],
     queryFn:  async () => (await api.get('/reports/revenue/deliverers', {
       params: { period, orderType, from: iso(from), to: iso(to) },
-    })).data.data,
+    })).data.data.deliverers,
     enabled: from !== undefined ? (!!from && !!to) : true,
   })
 
