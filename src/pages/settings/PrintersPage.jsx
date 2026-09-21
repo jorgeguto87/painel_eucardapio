@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Printer, Download, RefreshCw, CheckCircle2, Copy } from 'lucide-react'
+import { Printer, Download, RefreshCw, CheckCircle2, Copy, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { formatDateTime } from '../../utils/format'
 import {
@@ -44,10 +45,16 @@ export default function PrintersPage() {
   const { data: status, isLoading } = usePrintAgentStatus({ poll: true })
   const generateCode = useGeneratePairingCode()
   const countdown = useCountdown(status?.pairingCodeExpiresAt)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const copyCode = () => {
     navigator.clipboard.writeText(status.pairingCode)
     toast.success('Código copiado!')
+  }
+
+  const confirmarNovoCodigo = () => {
+    setConfirmOpen(false)
+    generateCode.mutate()
   }
 
   if (isLoading || !status) return <LoadingSpinner />
@@ -78,10 +85,23 @@ export default function PrintersPage() {
         {status.isLinked ? (
           <>
             <Card>
-              <div className="flex items-center gap-2 text-success text-sm mb-3">
-                <CheckCircle2 size={16} />
-                Programinha conectado
-              </div>
+              {status.isOnline ? (
+                <div className="flex items-center gap-2 text-success text-sm mb-3">
+                  <CheckCircle2 size={16} />
+                  Programinha conectado
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-warning text-sm mb-3">
+                  <AlertTriangle size={16} />
+                  Pareado, mas não detectado agora
+                </div>
+              )}
+              {!status.isOnline && (
+                <p className="text-xs text-gray-400 mb-3 -mt-2">
+                  O computador não avisa que está online há um tempo — confira se o programinha
+                  está aberto lá. Se continuar assim, gere um novo código abaixo.
+                </p>
+              )}
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-400">Computador</span>
@@ -119,12 +139,13 @@ export default function PrintersPage() {
             <Card>
               <h3 className="font-semibold text-sm mb-1">Trocar de computador</h3>
               <p className="text-xs text-gray-400 mb-3">
-                Gerar um novo código desconecta o programinha atual — só o próximo a parear com
-                esse código fica ativo. Use isso pra trocar de computador, não pra rotina.
+                Gerar um novo código desconecta o programinha atual imediatamente — ele para de
+                imprimir na hora, mesmo que ainda esteja aberto no outro computador. Use isso pra
+                trocar de computador, não pra rotina.
               </p>
               <Button
                 full variant="secondary" loading={generateCode.isPending}
-                onClick={() => generateCode.mutate()}
+                onClick={() => setConfirmOpen(true)}
               >
                 <RefreshCw size={16} className="mr-1.5" /> Gerar novo código de pareamento
               </Button>
@@ -161,6 +182,23 @@ export default function PrintersPage() {
           </Card>
         )}
       </div>
+
+      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Gerar novo código?">
+        <p className="text-sm text-gray-500 mb-4">
+          O programinha conectado agora ({status.deviceName || 'computador atual'}) vai ser
+          desconectado <span className="font-semibold text-secondary">imediatamente</span> e vai
+          parar de imprimir. Você vai precisar parear de novo com o código novo, no computador que
+          quiser usar daqui pra frente.
+        </p>
+        <div className="flex gap-2">
+          <Button full variant="secondary" onClick={() => setConfirmOpen(false)}>
+            Desistir
+          </Button>
+          <Button full loading={generateCode.isPending} onClick={confirmarNovoCodigo}>
+            Confirmar e desconectar
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }
