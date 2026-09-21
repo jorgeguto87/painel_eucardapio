@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Trash2, ChevronDown, Check, Plus, X, GripVertical, Info, Sparkles,
-  Upload, Link as LinkIcon, ImagePlus, Save, ArrowLeft, HelpCircle,
+  Upload, Link as LinkIcon, ImagePlus, Save, ArrowLeft, HelpCircle, Minus,
+  SkipForward, Layers,
 } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Button from '../../components/ui/Button'
@@ -32,6 +33,53 @@ const NAO_PRECISA_NOME = 'Não precisa'
 // Centavos → string com vírgula, sempre com 2 casas (ex: 2000 → "20,00").
 const formatarPrecoParaInput = (cents = 0) => (cents / 100).toFixed(2).replace('.', ',')
 
+// ─── Seletor +/- pra mínimo/máximo — em vez de campo pra digitar, que no
+// celular costuma "grudar" o número (toca, digita, e o valor vira uma
+// concatenação em vez de substituir). Sempre limitado por [min, max], então
+// nunca deixa configurar mais do que a quantidade de itens disponíveis.
+function NumberStepper({ value, min, max, onChange }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-1 py-1">
+      <button
+        type="button"
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+        className="flex size-6 items-center justify-center rounded-md text-secondary hover:bg-bg disabled:opacity-30"
+      >
+        <Minus size={13} />
+      </button>
+      <span className="w-5 text-center text-sm font-bold tabular-nums">{value}</span>
+      <button
+        type="button"
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-30"
+      >
+        <Plus size={13} />
+      </button>
+    </div>
+  )
+}
+
+// ─── Toggle "Oferecer opção de pular" — controla o item "Não precisa" +
+// permiteNaoPrecisa + força mínimo 0, tudo junto (opcionais grátis e
+// opcionais por variante usam exatamente o mesmo componente). ───────────────
+function ToggleNaoPrecisa({ ativo, onToggle }) {
+  return (
+    <label className="flex items-center justify-between gap-2 rounded-lg bg-bg px-2.5 py-2 cursor-pointer">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-secondary">
+        <SkipForward size={13} className="text-primary" /> Oferecer opção de pular ("Não precisa")
+      </span>
+      <span
+        onClick={(e) => { e.preventDefault(); onToggle(!ativo) }}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${ativo ? 'bg-primary' : 'bg-gray-300'}`}
+      >
+        <span className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${ativo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+      </span>
+    </label>
+  )
+}
+
 // ─── Título numerado de seção, igual ao padrão do protótipo ────────────────
 
 function SectionTitle({ number, title, text }) {
@@ -48,10 +96,9 @@ function SectionTitle({ number, title, text }) {
 
 // ─── Opção de variante, arrastável, com link de personalizar regra ─────────
 
-function OpcaoArrastavel({ id, opcao, onChangeNome, onChangePreco, onRemover, temOpcionais, onAbrirPersonalizar }) {
+function OpcaoArrastavel({ id, opcao, onChangeNome, onChangePreco, onRemover, temCategoriasDisponiveis, onAbrirOpcionais }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
-  const temOverride = (opcao.opcionalRulesOverride || []).length > 0
 
   return (
     <div ref={setNodeRef} style={style} className="space-y-1.5">
@@ -78,82 +125,118 @@ function OpcaoArrastavel({ id, opcao, onChangeNome, onChangePreco, onRemover, te
           <X size={16} />
         </button>
       </div>
-      {temOpcionais && (
+      {temCategoriasDisponiveis && (
         <button
           type="button"
-          onClick={onAbrirPersonalizar}
-          className={`ml-7 flex items-center gap-1 text-[11px] font-semibold hover:underline ${temOverride ? 'text-primary' : 'text-gray-400'}`}
+          onClick={onAbrirOpcionais}
+          className={`ml-7 flex items-center gap-1 text-[11px] font-semibold hover:underline ${opcao.customOpcionais ? 'text-primary' : 'text-gray-400'}`}
         >
-          <Sparkles size={11} /> {temOverride ? 'Regra de opcionais personalizada ✓' : `Personalizar quantas escolhas "${opcao.name || 'esta opção'}" permite`}
+          <Sparkles size={11} /> {opcao.customOpcionais ? 'Opcionais personalizados para esta opção ✓' : `Escolher opcionais de "${opcao.name || 'esta opção'}"`}
         </button>
       )}
     </div>
   )
 }
 
-// ─── Painel (modal) de regra específica por variante ───────────────────────
+// ─── Painel (modal) de opcionais por variante — cada opção pode ter seu
+// próprio conjunto de categorias/itens/regras, independente do que está
+// configurado em "O que o cliente pode escolher?" (preço simples). ─────────
 
-function PainelRegraVariante({ aberto, onClose, grupo, opcao, opcionalGroups, onChangeOverrideRule }) {
+function PainelOpcionaisVariante({
+  aberto, onClose, grupo, opcao, todasCategorias,
+  onAtivarCustom, onDesativarCustom, onToggleCategoria, onToggleItem, onChangeRule, onToggleNaoPrecisa,
+}) {
   if (!aberto || !opcao) return null
 
   const overrides = opcao.opcionalRulesOverride || []
   const getOverride = (catKey) => overrides.find((r) => r.categoryKey === catKey)
 
   return (
-    <Modal open={aberto} onClose={onClose} title="Exceção por variante">
+    <Modal open={aberto} onClose={onClose} title="Opcionais desta variante">
       <div className="space-y-4">
         <div className="rounded-xl bg-primary/5 border border-primary/20 px-3 py-2.5 text-xs text-secondary">
           Ligado a: <span className="font-semibold">{grupo?.name}</span> → <span className="font-semibold text-primary">{opcao.name || 'esta opção'}</span>
         </div>
-        <p className="text-xs text-gray-400">
-          Defina uma regra diferente da padrão só pra essa opção específica. Categorias sem exceção continuam usando a regra padrão do produto.
-        </p>
 
-        <div className="space-y-3">
-          {opcionalGroups.map((g) => {
-            const override = getOverride(g.key)
-            const usaPadrao = !override
-            return (
-              <div key={g.key} className="rounded-xl border border-gray-200 p-3">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="text-sm font-semibold text-secondary">{g.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (usaPadrao) { onChangeOverrideRule(g.key, 'min', g.min); onChangeOverrideRule(g.key, 'max', g.max) }
-                      else onChangeOverrideRule(g.key, null, null)
-                    }}
-                    className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${usaPadrao ? 'border-gray-200 text-gray-400' : 'border-primary text-primary bg-primary/5'}`}
-                  >
-                    {usaPadrao ? 'Usar padrão' : 'Exceção ativa'}
-                  </button>
-                </div>
-                {usaPadrao ? (
-                  <p className="text-[11px] text-gray-400">Padrão: escolha de {g.min} a {g.max}</p>
-                ) : (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[11px] text-gray-400 line-through">Padrão: {g.min} a {g.max}</span>
-                    <span className="text-[11px] text-primary font-semibold">→</span>
-                    <div className="flex items-center gap-1.5">
-                      <input type="number" min="0" max="20" value={override.min}
-                        onChange={(e) => onChangeOverrideRule(g.key, 'min', Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-11 text-xs text-center px-1 py-1 rounded-lg border border-primary/40" />
-                      <span className="text-[11px] text-gray-400">a</span>
-                      <input type="number" min="1" max="20" value={override.max}
-                        onChange={(e) => onChangeOverrideRule(g.key, 'max', Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-11 text-xs text-center px-1 py-1 rounded-lg border border-primary/40" />
-                    </div>
+        {!opcao.customOpcionais ? (
+          <>
+            <p className="text-xs text-gray-400">
+              Esta opção está usando as mesmas categorias e a mesma regra configuradas em
+              "O que o cliente pode escolher?" (a mesma coisa que vale pro preço simples).
+              Personalize só se essa opção específica precisar de opcionais diferentes.
+            </p>
+            <Button full variant="secondary" onClick={onAtivarCustom}>
+              <Layers size={15} className="mr-1.5" /> Personalizar opcionais desta opção
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-gray-400">Escolha uma ou mais categorias pra essa opção.</p>
+              <button type="button" onClick={onDesativarCustom} className="text-[11px] font-semibold text-gray-400 hover:text-danger shrink-0">
+                Voltar ao padrão do produto
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {todasCategorias.map((cat) => {
+                const override = getOverride(cat.key)
+                const ativo = !!override
+                const itemIds = override?.itemIds || []
+                return (
+                  <div key={cat.key} className={`rounded-xl border p-3 ${ativo ? 'border-primary/30' : 'border-gray-200'}`}>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={ativo} onChange={() => onToggleCategoria(cat)} />
+                      <span className="text-sm font-semibold text-secondary">{cat.name}</span>
+                      <span className="text-[11px] text-gray-400">({cat.items.length} itens)</span>
+                    </label>
+
+                    {ativo && (
+                      <div className="mt-3 space-y-3 pl-1">
+                        <div className="flex flex-wrap gap-2">
+                          {cat.items.map((it) => (
+                            <button
+                              key={it._id} type="button"
+                              onClick={() => onToggleItem(cat.key, it._id)}
+                              className={`text-xs px-3 py-1.5 rounded-full border ${itemIds.includes(it._id) ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}
+                            >
+                              {it.name}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-3 rounded-lg bg-bg p-2.5">
+                          <div className="flex-1 flex items-center justify-between">
+                            <span className="text-[11px] text-gray-400">Mínimo</span>
+                            <NumberStepper
+                              value={override.min} min={0} max={Math.max(0, override.max)}
+                              onChange={(v) => onChangeRule(cat.key, 'min', v)}
+                            />
+                          </div>
+                          <div className="flex-1 flex items-center justify-between">
+                            <span className="text-[11px] text-gray-400">Máximo</span>
+                            <NumberStepper
+                              value={override.max} min={Math.max(1, override.min)} max={Math.max(1, itemIds.length)}
+                              onChange={(v) => onChangeRule(cat.key, 'max', v)}
+                            />
+                          </div>
+                        </div>
+
+                        <ToggleNaoPrecisa
+                          ativo={!!override.permiteNaoPrecisa}
+                          onToggle={(ligar) => onToggleNaoPrecisa(cat, ligar)}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-                {!usaPadrao && (
-                  <p className="mt-2 text-[11px] text-gray-500 bg-bg rounded-lg px-2.5 py-2 leading-relaxed">
-                    O cliente que escolher <strong>{opcao.name || 'esta opção'}</strong> poderá selecionar {override.min === override.max ? `exatamente ${override.max}` : `de ${override.min} a ${override.max}`} item(ns) em "{g.name}". Nas outras opções, o limite continua sendo {g.min === g.max ? `${g.max}` : `${g.min} a ${g.max}`}.
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+              {todasCategorias.length === 0 && (
+                <p className="text-xs text-gray-400 text-center py-4">Nenhuma categoria de opcional cadastrada ainda no restaurante.</p>
+              )}
+            </div>
+          </>
+        )}
 
         <Button full onClick={onClose}>Concluído</Button>
       </div>
@@ -221,7 +304,10 @@ export default function ProductFormPage() {
             _key: crypto.randomUUID(), name: g.name,
             options: (g.options || []).map((o) => ({
               _key: crypto.randomUUID(), name: o.name, price: formatarPrecoParaInput(o.price),
-              opcionalRulesOverride: o.opcionalRulesOverride || [],
+              customOpcionais: o.customOpcionais || false,
+              opcionalRulesOverride: (o.opcionalRulesOverride || []).map((r) => ({
+                ...r, itemIds: (r.itemIds || []).map((it) => it._id || it),
+              })),
             })),
           }))
         )
@@ -273,8 +359,24 @@ export default function ProductFormPage() {
     setGruposVariacao((gs) => gs.map((g, i) => (i === index ? { ...g, name: nome } : g)))
   }
 
+  // Opção nova herda automaticamente a configuração de opcionais da última
+  // opção do mesmo grupo (se ela tiver uma personalizada) — assim o
+  // restaurante não precisa configurar do zero pra cada tamanho/variação,
+  // só ajustar o que for diferente.
   const adicionarOpcao = (grupoIndex) => {
-    setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: [...g.options, { _key: crypto.randomUUID(), name: '', price: '0,00' }] } : g)))
+    setGruposVariacao((gs) => gs.map((g, i) => {
+      if (i !== grupoIndex) return g
+      const ultima = g.options[g.options.length - 1]
+      const heranca = ultima?.customOpcionais
+        ? {
+            customOpcionais: true,
+            opcionalRulesOverride: (ultima.opcionalRulesOverride || []).map((r) => ({
+              ...r, itemIds: r.itemIds ? [...r.itemIds] : undefined,
+            })),
+          }
+        : {}
+      return { ...g, options: [...g.options, { _key: crypto.randomUUID(), name: '', price: '0,00', ...heranca }] }
+    }))
   }
 
   const atualizarOpcao = (grupoIndex, opcaoIndex, campo, valor) => {
@@ -293,23 +395,88 @@ export default function ProductFormPage() {
     setGruposVariacao((gs) => gs.map((g, i) => (i === grupoIndex ? { ...g, options: opcoesReordenadas } : g)))
   }
 
-  const atualizarOverrideOpcional = (grupoIndex, opcaoIndex, catKey, campo, valor) => {
+  // Aplica uma função de atualização na opção certa dentro do grupo certo —
+  // reaproveitado por todos os handlers de "opcionais por variante" abaixo.
+  const atualizarOpcaoRegra = (grupoIndex, opcaoIndex, fn) => {
     setGruposVariacao((gs) => gs.map((g, i) => {
       if (i !== grupoIndex) return g
-      const options = g.options.map((o, j) => {
-        if (j !== opcaoIndex) return o
-        const overridesAtuais = o.opcionalRulesOverride || []
-        if (campo === null) {
-          return { ...o, opcionalRulesOverride: overridesAtuais.filter((r) => r.categoryKey !== catKey) }
-        }
-        const existe = overridesAtuais.some((r) => r.categoryKey === catKey)
-        const opcionalRulesOverride = existe
-          ? overridesAtuais.map((r) => (r.categoryKey === catKey ? { ...r, [campo]: valor } : r))
-          : [...overridesAtuais, { categoryKey: catKey, min: 1, max: 1, [campo]: valor }]
-        return { ...o, opcionalRulesOverride }
-      })
+      const options = g.options.map((o, j) => (j === opcaoIndex ? fn(o) : o))
       return { ...g, options }
     }))
+  }
+
+  // Liga o modo "opcionais personalizados" nessa opção — semeia a partir do
+  // que já está configurado em "O que o cliente pode escolher?" (produto
+  // inteiro), com todos os itens de cada categoria pré-marcados, pra não
+  // obrigar o restaurante a montar tudo de novo do zero.
+  const ativarCustomOpcionais = (grupoIndex, opcaoIndex) => {
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => ({
+      ...o,
+      customOpcionais: true,
+      opcionalRulesOverride: o.opcionalRulesOverride?.length ? o.opcionalRulesOverride : opcionalGroups.map((g) => ({
+        categoryKey: g.key,
+        min: g.min,
+        max: g.max,
+        permiteNaoPrecisa: !!g.permiteNaoPrecisa,
+        itemIds: g.items.map((it) => it._id),
+      })),
+    }))
+  }
+
+  const desativarCustomOpcionais = (grupoIndex, opcaoIndex) => {
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => ({ ...o, customOpcionais: false }))
+  }
+
+  // Ativa/desativa uma categoria pra essa opção específica — ao ativar,
+  // começa com todos os itens da categoria marcados (fácil de desmarcar o
+  // que não quer do que exigir marcar um por um).
+  const toggleCategoriaVariante = (grupoIndex, opcaoIndex, cat) => {
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => {
+      const atuais = o.opcionalRulesOverride || []
+      const existe = atuais.some((r) => r.categoryKey === cat.key)
+      const opcionalRulesOverride = existe
+        ? atuais.filter((r) => r.categoryKey !== cat.key)
+        : [...atuais, { categoryKey: cat.key, min: 0, max: Math.max(1, cat.items.length), permiteNaoPrecisa: false, itemIds: cat.items.map((it) => it._id) }]
+      return { ...o, opcionalRulesOverride }
+    })
+  }
+
+  const toggleItemVariante = (grupoIndex, opcaoIndex, catKey, itemId) => {
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => {
+      const opcionalRulesOverride = (o.opcionalRulesOverride || []).map((r) => {
+        if (r.categoryKey !== catKey) return r
+        const itemIds = r.itemIds.includes(itemId) ? r.itemIds.filter((x) => x !== itemId) : [...r.itemIds, itemId]
+        // O máximo nunca pode passar da quantidade de itens escolhidos.
+        return { ...r, itemIds, max: Math.min(r.max, Math.max(1, itemIds.length)) }
+      })
+      return { ...o, opcionalRulesOverride }
+    })
+  }
+
+  const changeRuleVariante = (grupoIndex, opcaoIndex, catKey, campo, valor) => {
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => {
+      const opcionalRulesOverride = (o.opcionalRulesOverride || []).map((r) => (r.categoryKey === catKey ? { ...r, [campo]: valor } : r))
+      return { ...o, opcionalRulesOverride }
+    })
+  }
+
+  const toggleNaoPrecisaVariante = async (grupoIndex, opcaoIndex, cat, ligar) => {
+    // Ligando: garante que existe um item "Não precisa" nessa categoria (cria
+    // se faltar, igual ao nível de produto) e inclui ele nos itens dessa
+    // variante. Desligando: só tira a marcação, mantém o item na lista.
+    let naoPrecisaId = cat.items.find((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase())?._id
+    if (ligar && !naoPrecisaId) {
+      const created = await createOpcional.mutateAsync({ name: NAO_PRECISA_NOME, categoryId: cat.key === SEM_CATEGORIA ? null : cat.key })
+      naoPrecisaId = created.data.data._id
+    }
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => {
+      const opcionalRulesOverride = (o.opcionalRulesOverride || []).map((r) => {
+        if (r.categoryKey !== cat.key) return r
+        const itemIds = ligar && naoPrecisaId && !r.itemIds.includes(naoPrecisaId) ? [...r.itemIds, naoPrecisaId] : r.itemIds
+        return { ...r, permiteNaoPrecisa: ligar, min: ligar ? 0 : (r.min || 1), itemIds, max: Math.max(r.max, itemIds.length ? 1 : r.max) }
+      })
+      return { ...o, opcionalRulesOverride }
+    })
   }
 
   const sensorsOpcoes = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -375,14 +542,26 @@ export default function ProductFormPage() {
     }))
   }
 
-  const addNaoPrecisa = async (group) => {
-    const existing = group.items.find((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase())
-    if (existing) {
-      if (!form.opcionaisIds.includes(existing._id)) setForm((f) => ({ ...f, opcionaisIds: [...f.opcionaisIds, existing._id] }))
-      return
+  // "Oferecer opção de pular" — cria (se faltar) o item "Não precisa" nessa
+  // categoria, marca ele como selecionado, liga permiteNaoPrecisa e força o
+  // mínimo pra 0 (o cardápio do cliente esconde esse 0, só mostra a opção de
+  // pular dentro da própria lista — ver ProductDetailSheet no cardápio).
+  const toggleNaoPrecisaProduto = async (group, ligar) => {
+    let naoPrecisaId = group.items.find((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase())?._id
+    if (ligar && !naoPrecisaId) {
+      const created = await createOpcional.mutateAsync({ name: NAO_PRECISA_NOME, categoryId: group.key === SEM_CATEGORIA ? null : group.key })
+      naoPrecisaId = created.data.data._id
     }
-    const created = await createOpcional.mutateAsync({ name: NAO_PRECISA_NOME, categoryId: group.key === SEM_CATEGORIA ? null : group.key })
-    setForm((f) => ({ ...f, opcionaisIds: [...f.opcionaisIds, created.data.data._id] }))
+    setForm((f) => {
+      const opcionaisIds = ligar && naoPrecisaId && !f.opcionaisIds.includes(naoPrecisaId)
+        ? [...f.opcionaisIds, naoPrecisaId]
+        : f.opcionaisIds
+      const existe = f.opcionalRules.some((r) => r.categoryKey === group.key)
+      const opcionalRules = existe
+        ? f.opcionalRules.map((r) => (r.categoryKey === group.key ? { ...r, permiteNaoPrecisa: ligar, min: ligar ? 0 : (r.min || 1) } : r))
+        : [...f.opcionalRules, { categoryKey: group.key, min: ligar ? 0 : 1, max: 1, permiteNaoPrecisa: ligar }]
+      return { ...f, opcionaisIds, opcionalRules }
+    })
   }
 
   const toggleOpcional = (opcId) => {
@@ -426,10 +605,20 @@ export default function ProductFormPage() {
           options: grupo.options.map((o) => ({
             name: o.name,
             price: toCents(String(o.price).replace(',', '.')),
+            customOpcionais: !!o.customOpcionais,
             ...(o.opcionalRulesOverride?.length ? { opcionalRulesOverride: o.opcionalRulesOverride } : {}),
           })),
         }))
       : []
+
+    // Qualquer item referenciado só dentro de uma variante (customOpcionais)
+    // também precisa estar em opcionaisIds — é o que garante que o backend
+    // vai popular esse item pro cardápio do cliente (o populate é feito só
+    // em cima desse array, nunca dentro de variantGroups).
+    const itemIdsDasVariantes = variantGroupsPayload
+      .flatMap((g) => g.options)
+      .flatMap((o) => o.opcionalRulesOverride || [])
+      .flatMap((r) => r.itemIds || [])
 
     const payload = {
       name:        form.name,
@@ -440,7 +629,7 @@ export default function ProductFormPage() {
       category:    form.category,
       imageUrl:    form.imageBase64 ? null : (form.imageUrl || null),
       imageBase64: form.imageBase64 || null,
-      opcionaisIds: form.opcionaisIds,
+      opcionaisIds: [...new Set([...form.opcionaisIds, ...itemIdsDasVariantes])],
       opcionalRules: form.opcionalRules,
       adicionaisIds: form.adicionaisIds,
     }
@@ -627,8 +816,8 @@ export default function ProductFormPage() {
                               onChangeNome={(valor) => atualizarOpcao(grupoIndex, opcaoIndex, 'name', valor)}
                               onChangePreco={(valor) => atualizarOpcao(grupoIndex, opcaoIndex, 'price', valor)}
                               onRemover={() => removerOpcao(grupoIndex, opcaoIndex)}
-                              temOpcionais={opcionalGroups.length > 0}
-                              onAbrirPersonalizar={() => setRegraVariante({ grupoIndex, opcaoIndex })}
+                              temCategoriasDisponiveis={opcionalGroups.length > 0}
+                              onAbrirOpcionais={() => setRegraVariante({ grupoIndex, opcaoIndex })}
                             />
                           ))}
                         </SortableContext>
@@ -715,7 +904,6 @@ export default function ProductFormPage() {
                   const selectedCount = groupIds.filter((gid) => form.opcionaisIds.includes(gid)).length
                   const isOpen = !!openCategories[`op-${group.key}`]
                   const todosMarcados = selectedCount === group.items.length
-                  const hasNaoPrecisa = group.items.some((i) => i.name.trim().toLowerCase() === NAO_PRECISA_NOME.toLowerCase() && form.opcionaisIds.includes(i._id))
 
                   return (
                     <div key={group.key} className={`rounded-xl border overflow-hidden ${isOpen ? 'border-primary/30' : 'border-gray-200'}`}>
@@ -726,7 +914,9 @@ export default function ProductFormPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">
-                            {group.min === group.max ? `Escolha ${group.max}` : `Escolha de ${group.min} a ${group.max}`}
+                            {group.permiteNaoPrecisa
+                              ? `Escolha ${group.max}`
+                              : group.min === group.max ? `Escolha ${group.max}` : `Escolha de ${group.min} a ${group.max}`}
                           </span>
                           <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </div>
@@ -741,40 +931,46 @@ export default function ProductFormPage() {
                               Marcar todos
                             </label>
                             <div className="flex flex-wrap gap-2">
-                              {group.items.map((o) => (
+                              {group.items
+                                .filter((o) => o.name.trim().toLowerCase() !== NAO_PRECISA_NOME.toLowerCase())
+                                .map((o) => (
                                 <button key={o._id} type="button" onClick={() => toggleOpcional(o._id)}
                                   className={`text-xs px-3 py-1.5 rounded-full border ${form.opcionaisIds.includes(o._id) ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}>
                                   {o.name}
                                 </button>
                               ))}
                             </div>
-                            {!hasNaoPrecisa && (
-                              <button type="button" onClick={() => addNaoPrecisa(group)} disabled={createOpcional.isPending} className="text-[11px] text-gray-400 underline underline-offset-2 disabled:opacity-50">
-                                + Adicionar opção "Não precisa" nessa categoria
-                              </button>
-                            )}
+                            <ToggleNaoPrecisa
+                              ativo={!!group.permiteNaoPrecisa}
+                              onToggle={(ligar) => toggleNaoPrecisaProduto(group, ligar)}
+                            />
                           </div>
 
                           {/* Coluna da regra */}
                           <div className="rounded-xl bg-bg p-3.5 space-y-2.5 h-fit">
                             <p className="text-xs font-bold text-secondary flex items-center gap-1.5"><HelpCircle size={13} className="text-primary" /> Quantos o cliente escolhe?</p>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1">
-                                <label className="text-[10px] text-gray-400">Mínimo</label>
-                                <input type="number" min="0" max="20" value={group.min}
-                                  onChange={(e) => setRuleFor(group.key, 'min', Math.max(0, parseInt(e.target.value) || 0))}
-                                  className="w-full text-sm text-center px-2 py-1.5 rounded-lg border border-gray-200" />
-                              </div>
-                              <span className="text-gray-300 mt-3.5">—</span>
-                              <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              {!group.permiteNaoPrecisa && (
+                                <div className="flex-1 flex flex-col items-center gap-1">
+                                  <label className="text-[10px] text-gray-400">Mínimo</label>
+                                  <NumberStepper
+                                    value={group.min} min={0} max={Math.max(0, group.max)}
+                                    onChange={(v) => setRuleFor(group.key, 'min', v)}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 flex flex-col items-center gap-1">
                                 <label className="text-[10px] text-gray-400">Máximo</label>
-                                <input type="number" min="1" max="20" value={group.max}
-                                  onChange={(e) => setRuleFor(group.key, 'max', Math.max(1, parseInt(e.target.value) || 1))}
-                                  className="w-full text-sm text-center px-2 py-1.5 rounded-lg border border-gray-200" />
+                                <NumberStepper
+                                  value={group.max} min={Math.max(1, group.min)} max={Math.max(1, group.items.length)}
+                                  onChange={(v) => setRuleFor(group.key, 'max', v)}
+                                />
                               </div>
                             </div>
                             <p className="text-[11px] text-primary font-semibold bg-primary/10 rounded-lg px-2.5 py-1.5">
-                              {group.min === group.max ? `Escolha exatamente ${group.max}` : group.min === 0 ? `Escolha até ${group.max}` : `Escolha de ${group.min} a ${group.max}`}
+                              {group.permiteNaoPrecisa
+                                ? `Escolha exatamente ${group.max} (ou "Não precisa")`
+                                : group.min === group.max ? `Escolha exatamente ${group.max}` : group.min === 0 ? `Escolha até ${group.max}` : `Escolha de ${group.min} a ${group.max}`}
                             </p>
                           </div>
                         </div>
@@ -811,15 +1007,17 @@ export default function ProductFormPage() {
                           Marcar todos
                         </label>
                       </div>
-                      <div className="space-y-2">
+                      <div className="flex flex-wrap gap-2">
                         {group.items.map((item) => {
                           const marcado = form.adicionaisIds.includes(item._id)
                           return (
-                            <label key={item._id} className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border p-2.5 cursor-pointer ${marcado ? 'border-primary/30 bg-primary/5' : 'border-gray-200'}`}>
-                              <input type="checkbox" checked={marcado} onChange={() => toggleAdicional(item._id)} />
-                              <span className="text-sm font-medium text-secondary">{item.name}</span>
-                              <span className="text-xs font-semibold text-success">{formatCurrency(item.price)}</span>
-                            </label>
+                            <button
+                              key={item._id} type="button" onClick={() => toggleAdicional(item._id)}
+                              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border ${marcado ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-500'}`}
+                            >
+                              {item.name}
+                              <span className={`font-semibold ${marcado ? 'text-primary' : 'text-success'}`}>{formatCurrency(item.price)}</span>
+                            </button>
                           )
                         })}
                       </div>
@@ -890,13 +1088,18 @@ export default function ProductFormPage() {
         </form>
       </div>
 
-      <PainelRegraVariante
+      <PainelOpcionaisVariante
         aberto={!!regraVariante}
         onClose={() => setRegraVariante(null)}
         grupo={grupoAtual}
         opcao={opcaoAtual}
-        opcionalGroups={opcionalGroups}
-        onChangeOverrideRule={(catKey, campo, valor) => regraVariante && atualizarOverrideOpcional(regraVariante.grupoIndex, regraVariante.opcaoIndex, catKey, campo, valor)}
+        todasCategorias={opcionalGroups}
+        onAtivarCustom={() => regraVariante && ativarCustomOpcionais(regraVariante.grupoIndex, regraVariante.opcaoIndex)}
+        onDesativarCustom={() => regraVariante && desativarCustomOpcionais(regraVariante.grupoIndex, regraVariante.opcaoIndex)}
+        onToggleCategoria={(cat) => regraVariante && toggleCategoriaVariante(regraVariante.grupoIndex, regraVariante.opcaoIndex, cat)}
+        onToggleItem={(catKey, itemId) => regraVariante && toggleItemVariante(regraVariante.grupoIndex, regraVariante.opcaoIndex, catKey, itemId)}
+        onChangeRule={(catKey, campo, valor) => regraVariante && changeRuleVariante(regraVariante.grupoIndex, regraVariante.opcaoIndex, catKey, campo, valor)}
+        onToggleNaoPrecisa={(cat, ligar) => regraVariante && toggleNaoPrecisaVariante(regraVariante.grupoIndex, regraVariante.opcaoIndex, cat, ligar)}
       />
     </div>
   )
