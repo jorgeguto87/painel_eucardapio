@@ -32,6 +32,12 @@ export const usePrintAgentStatus = ({ poll = false } = {}) =>
  * Gera (ou renova) o código de pareamento — o restaurante digita esse
  * código uma única vez dentro do programinha recém-instalado.
  */
+/**
+ * Gerar um código novo desconecta o vínculo atual NA HORA (o painel sempre
+ * confirma isso com o restaurante antes de chamar mutate() — ver o modal em
+ * PrintersPage.jsx). O programinha antigo detecta sozinho na próxima
+ * tentativa de heartbeat e volta pra tela de "pedir código".
+ */
 export const useGeneratePairingCode = () => {
   const qc = useQueryClient()
   return useMutation({
