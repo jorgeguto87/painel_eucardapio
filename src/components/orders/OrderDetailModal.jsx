@@ -146,7 +146,7 @@ function OrderDetailBody({ order, printStatus, deliverers, confirmManualPix, can
               {order.items.map((item, i) => (
                 <div key={i} className="text-sm">
                   <div className="flex justify-between">
-                    <span>{item.quantity}x {item.name}</span>
+                    <span translate="no">{item.quantity}x {item.name}</span>
                     <span className="font-medium">{formatCurrency(item.subtotal)}</span>
                   </div>
                   {item.chosenVariants?.length > 0 && (
