@@ -26,6 +26,11 @@ function DelivererCard({ deliverer, onSelect }) {
 
   const handleSend = (e) => {
     e.stopPropagation()
+    // Sem essa trava, clicar de novo enquanto ainda mostra "…" (ou um
+    // duplo clique rápido) disparava duas mutations em paralelo, mandando
+    // a mesma lista numerada de entregas duas vezes pro WhatsApp do
+    // entregador.
+    if (sendQueue.isPending) return
     sendQueue.mutate(deliverer._id)
   }
 
