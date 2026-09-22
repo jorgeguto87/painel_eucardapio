@@ -58,7 +58,7 @@ export function OrderCard({ order, onOpen, now }) {
           )}
         </div>
         <div className="text-[11px] text-gray-400 truncate">
-          {customerLabel(order)}
+          <span translate="no">{customerLabel(order)}</span>
           {order.customerName && order.customerPhone ? ` · ${order.customerPhone}` : ''} · {timeHM(order.createdAt)}
         </div>
         <div className="mt-1 font-semibold text-secondary tabular-nums">{formatCurrency(order.total)}</div>
@@ -87,7 +87,7 @@ export function OrderRow({ order, onOpen, now, showStatus = true, showAction = t
           {showStatus && <Badge status={order.status} />}
         </div>
         <div className="mt-1 text-[11px] text-gray-400 truncate">
-          {customerLabel(order)} · {timeHM(order.createdAt)}{now ? ` · ${elapsedLabel(order.createdAt, now)}` : ''}
+          <span translate="no">{customerLabel(order)}</span> · {timeHM(order.createdAt)}{now ? ` · ${elapsedLabel(order.createdAt, now)}` : ''}
         </div>
         <div className="mt-0.5 font-semibold text-sm text-secondary tabular-nums">{formatCurrency(order.total)}</div>
       </div>
