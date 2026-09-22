@@ -423,8 +423,14 @@ export default function ProductFormPage() {
     }))
   }
 
+  // Some com a regra personalizada de propósito (não só desliga a flag) —
+  // deixar opcionalRulesOverride no state fazia ele continuar sendo
+  // enviado no payload (handleSubmit só omite o campo quando o array vem
+  // vazio), e no cardápio a regra antiga continuava valendo mesmo com
+  // "Personalizar" aparecendo desligado na tela, porque nada checava
+  // customOpcionais antes de consultar o override.
   const desativarCustomOpcionais = (grupoIndex, opcaoIndex) => {
-    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => ({ ...o, customOpcionais: false }))
+    atualizarOpcaoRegra(grupoIndex, opcaoIndex, (o) => ({ ...o, customOpcionais: false, opcionalRulesOverride: [] }))
   }
 
   // Ativa/desativa uma categoria pra essa opção específica — ao ativar,
@@ -446,8 +452,15 @@ export default function ProductFormPage() {
       const opcionalRulesOverride = (o.opcionalRulesOverride || []).map((r) => {
         if (r.categoryKey !== catKey) return r
         const itemIds = r.itemIds.includes(itemId) ? r.itemIds.filter((x) => x !== itemId) : [...r.itemIds, itemId]
-        // O máximo nunca pode passar da quantidade de itens escolhidos.
-        return { ...r, itemIds, max: Math.min(r.max, Math.max(1, itemIds.length)) }
+        // O máximo nunca pode passar da quantidade de itens escolhidos — e o
+        // mínimo nunca pode passar do máximo (senão, ao desmarcar itens e o
+        // máximo cair abaixo do mínimo configurado antes, o produto fica
+        // IMPOSSÍVEL de pedir: o cliente nunca consegue escolher itens
+        // suficientes pra bater o mínimo, porque a seleção já trava no novo
+        // máximo, menor).
+        const max = Math.min(r.max, Math.max(1, itemIds.length))
+        const min = Math.min(r.min, max)
+        return { ...r, itemIds, max, min }
       })
       return { ...o, opcionalRulesOverride }
     })
