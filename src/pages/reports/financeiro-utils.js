@@ -57,20 +57,35 @@ export const variacao = (atual, anterior) => {
   return ((atual - anterior) / anterior) * 100
 }
 
+// A quebra por forma de pagamento no relatório (getPaymentMethodBreakdown,
+// no backend) não usa mais o valor cru de `paymentMethod` — ele agrupa
+// "cash_on_delivery" em 3 grupos diferentes conforme o tipo do pedido
+// (mesa_local / balcao_local / entrega_local), porque esse mesmo valor por
+// baixo do capô representa "pago à mesa", "pago no balcão" e "pago na
+// entrega" ao mesmo tempo, e mostrar tudo como "Pagamento na entrega" era
+// exatamente o bug relatado (pedido de mesa/balcão aparecendo como entrega).
+// `cash_on_delivery` continua aqui só de fallback, caso algum relatório
+// antigo/outro consumidor ainda mande o valor cru.
 export const PAYMENT_LABELS = {
   pix:              'Pix',
   credit_card:      'Cartão de crédito',
   debit_card:       'Cartão de débito',
-  cash_on_delivery: 'Pagamento na entrega',
   pix_manual:       'Pix avulso',
+  mesa_local:       'Pago na mesa',
+  balcao_local:     'Pago no balcão',
+  entrega_local:    'Pago na entrega',
+  cash_on_delivery: 'Pagamento na entrega',
 }
 
 export const PAYMENT_COLORS = {
   pix:              '#22C55E',
   credit_card:      '#FF6B2C',
   debit_card:       '#FF8C5A',
-  cash_on_delivery: '#F59E0B',
   pix_manual:       '#1A1A2E',
+  mesa_local:       '#6366F1',
+  balcao_local:     '#0EA5E9',
+  entrega_local:    '#F59E0B',
+  cash_on_delivery: '#F59E0B',
 }
 
 export const paymentLabel = (key) => PAYMENT_LABELS[key] || key
