@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 export default function Modal({ open, onClose, title, children }) {
   // Trava o scroll do body quando aberto
@@ -11,7 +12,18 @@ export default function Modal({ open, onClose, title, children }) {
 
   if (!open) return null
 
-  return (
+  // Renderiza direto em document.body (portal) em vez de na posição normal
+  // da árvore React — sem isso, um Modal aberto de dentro de um elemento
+  // que tem ANY `transform` aplicado (mesmo só no :hover, como o
+  // `hover:-translate-y-0.5` do card de pedido) fica "preso" dentro dele:
+  // pela especificação de CSS, um ancestral com transform vira o
+  // "containing block" de um filho `position: fixed`, então o modal para
+  // de se posicionar relativo à tela inteira e passa a ficar cortado pelo
+  // tamanho/overflow do card. Foi exatamente esse bug que fazia o modal de
+  // "Atribuir entregador" (aberto de dentro do card do pedido) piscar sem
+  // abrir direito, e o clique "fora dele" cair no card por baixo (que abre
+  // o pedido) em vez de fechar o modal.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -31,6 +43,7 @@ export default function Modal({ open, onClose, title, children }) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
