@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Bike, ChevronLeft, GripVertical, ArrowRightLeft, Send } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
@@ -188,7 +189,11 @@ export default function DeliveryQueueModal({ open, onClose, onOpenOrder }) {
   const active = (deliverers || []).filter((d) => d.isActive !== false)
   const selected = active.find((d) => d._id === selectedId)
 
-  return (
+  // Portal direto pra document.body — mesmo motivo do componente Modal
+  // genérico (ver comentário lá): protege contra abrir esse modal de
+  // dentro de qualquer elemento com `transform` (mesmo só no :hover),
+  // agora ou no futuro, sem depender de lembrar disso toda vez.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-3xl sm:w-[calc(100%-1.5rem)] max-h-[90vh] overflow-y-auto bg-surface rounded-t-2xl sm:rounded-2xl shadow-xl z-10">
@@ -227,6 +232,7 @@ export default function DeliveryQueueModal({ open, onClose, onOpenOrder }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
