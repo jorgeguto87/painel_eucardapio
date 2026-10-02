@@ -278,11 +278,7 @@ const str='';
             </div>
           </div>
 
-          <div className="bg-bg rounded-xl p-3 text-xs text-gray-500">
-            Taxa de adesão (cobrada agora, uma única vez): <strong>{formatCurrency(plan?.setupFee || 0)}</strong>.
-            {' '}Depois disso, a mensalidade escolhida acima passa a valer a partir da primeira cobrança.
-          </div>
-
+          
           <div>
             <label className="label">Forma de pagamento da adesão</label>
             <div className="flex gap-2 mt-1">
