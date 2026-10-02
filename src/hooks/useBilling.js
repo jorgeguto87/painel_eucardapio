@@ -54,8 +54,8 @@ export const useCheckPayment = () => {
 export const useSubscribe = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ billingDay, paymentMethod, termsAccepted }) =>
-      (await api.post('/billing/me/subscribe', { billingDay, paymentMethod, termsAccepted })).data.data,
+    mutationFn: async ({ billingDay, billingPeriod, paymentMethod, termsAccepted }) =>
+      (await api.post('/billing/me/subscribe', { billingDay, billingPeriod, paymentMethod, termsAccepted })).data.data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['billing', 'me'] }),
     onError:   (err) => toast.error(err.response?.data?.error?.message || 'Erro ao iniciar assinatura'),
   })
