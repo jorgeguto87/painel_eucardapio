@@ -13,7 +13,7 @@ const ITEMS = [
   { to: '/reports',             icon: BarChart3,     label: 'Relatórios de faturamento', adminOnly: true },
   { to: '/settings/profile',    icon: Store,         label: 'Dados do restaurante', adminOnly: true },
   { to: '/settings/bot',        icon: MessageSquare, label: 'Mensagens do bot', adminOnly: true },
-  { to: '/settings/hours',      icon: Clock,         label: 'Horário de funcionamento' },
+  { to: '/settings/hours',      icon: Clock,         label: 'Horário de funcionamento', adminOnly: true },
   { to: '/settings/payments',   icon: CreditCard,    label: 'Pagamentos', adminOnly: true },
   { to: '/settings/printers',   icon: Printer,       label: 'Impressoras', adminOnly: true },
   { to: '/settings/deliverers', icon: Bike,          label: 'Entregadores' },

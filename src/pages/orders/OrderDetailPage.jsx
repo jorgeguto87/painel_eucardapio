@@ -8,6 +8,7 @@ import Button from '../../components/ui/Button'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import DeliveryAssigner from '../../components/orders/DeliveryAssigner'
+import { isAwaitingOnlinePayment, CANCEL_CONFIRM_TEXT } from '../../components/orders/PrimaryActionButton'
 import { useOrder, useCancelOrder, useUpdateOrderStatus, useConfirmManualPix } from '../../hooks/useOrders'
 import { usePrintAgentStatus, usePrintOrder, PRINTER_ROLE_LABELS } from '../../hooks/usePrintAgent'
 import { formatCurrency, formatShortId, formatDateTime } from '../../utils/format'
@@ -86,7 +87,10 @@ export default function OrderDetailPage() {
   // deve virar "preparo" quando a cozinha realmente começar, não assim que
   // o pagamento for confirmado (senão o cliente vê uma informação errada
   // sobre o andamento real do pedido).
-  const canStartPreparing = ['recebido', 'pago'].includes(order.status)
+  // Pagamento online ainda não aprovado → não dá pra iniciar o preparo (o
+  // servidor também recusa).
+  const awaitingOnlinePayment = isAwaitingOnlinePayment(order)
+  const canStartPreparing = ['recebido', 'pago'].includes(order.status) && !awaitingOnlinePayment
   // Ciclo curto não tem entregador pra avançar sozinho até "finalizado" —
   // o restaurante marca "Concluído" manualmente na hora de entregar.
   const canFinishMesa = isCicloCurto && order.status === 'preparo'
@@ -97,7 +101,7 @@ export default function OrderDetailPage() {
   const isAwaitingManualPix = order.paymentMethod === 'pix_manual' && order.status === 'recebido'
 
   const handleCancel = () => {
-    if (window.confirm('Cancelar este pedido? Essa ação não pode ser desfeita.')) {
+    if (window.confirm(CANCEL_CONFIRM_TEXT)) {
       cancelOrder.mutate(order._id, { onSuccess: () => navigate('/orders') })
     }
   }
@@ -126,6 +130,11 @@ export default function OrderDetailPage() {
               <KeyRound size={15} />
               Confirmar pagamento
             </Button>
+          )}
+          {awaitingOnlinePayment && (
+            <span className="text-xs font-semibold text-gray-500 bg-gray-100 rounded-lg px-3 py-2">
+              Aguardando pagamento online
+            </span>
           )}
           {canStartPreparing && (
             <Button

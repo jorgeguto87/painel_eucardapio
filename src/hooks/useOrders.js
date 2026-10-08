@@ -15,6 +15,38 @@ export const useOrders = (status, orderType) =>
     refetchInterval: 30000, // polling a cada 30s
   })
 
+/**
+ * TODOS os pedidos em aberto (recebido, pago, preparo, saiu_entrega), sem
+ * paginação — é o que o quadro de pedidos usa. (useOrders acima é paginado:
+ * só os 20 mais recentes de qualquer status — servia pra histórico/recentes,
+ * mas no quadro escondia pedidos ainda em andamento num dia movimentado.)
+ */
+export const useOpenOrders = (orderType) =>
+  useQuery({
+    queryKey: ['orders', 'open', orderType || 'all'],
+    queryFn:  async () => {
+      const params = {}
+      if (orderType) params.orderType = orderType
+      const { data } = await api.get('/orders/open', { params })
+      return data.data
+    },
+    refetchInterval: 30000,
+  })
+
+/**
+ * Resumo do dia (fuso de São Paulo) calculado no servidor: contagem e
+ * faturamento por canal + quantidade de pedidos em aberto.
+ */
+export const useTodaySummary = () =>
+  useQuery({
+    queryKey: ['orders', 'summary', 'today'],
+    queryFn:  async () => {
+      const { data } = await api.get('/orders/summary/today')
+      return data.data
+    },
+    refetchInterval: 60000,
+  })
+
 export const useOrder = (id) =>
   useQuery({
     queryKey: ['orders', id],

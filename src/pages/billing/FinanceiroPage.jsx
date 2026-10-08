@@ -38,9 +38,14 @@ export default function FinanceiroPage() {
 
   if (isLoading) return <LoadingSpinner />
 
-  const { subscription, pendingBilling, history, plan } = data || {}
+  const { subscription, pendingBilling, history, plan, canSubscribe } = data || {}
   const isRestricted = ['past_due', 'suspended'].includes(subscription?.status)
   const isTrial = subscription?.status === 'trial'
+  // Pode assinar pelo "Assinar plano": no teste, ou saiu dele sem nunca ter
+  // assinado (o servidor decide — canSubscribe). Assinar de novo com uma
+  // adesão em aberto só atualiza essa mesma adesão (dia/período/forma).
+  const showSubscribe = canSubscribe ?? isTrial
+  const trialEnded = !isTrial && (canSubscribe ?? false)
   const trialDaysLeft = subscription?.trialEndsAt
     ? Math.max(0, Math.ceil((new Date(subscription.trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24)))
     : null
@@ -66,14 +71,42 @@ export default function FinanceiroPage() {
       toast.error('É necessário aceitar o termo de adesão.')
       return
     }
-    await subscribe.mutateAsync({
-      billingDay: day,
-      billingPeriod: subscribeForm.billingPeriod,
-      paymentMethod: subscribeForm.paymentMethod,
-      termsAccepted: true,
-    })
+    // Cartão: abre a aba JÁ, ainda dentro do clique (senão o navegador
+    // bloqueia como pop-up) e depois manda para o checkout do Mercado Pago.
+    const newTab = subscribeForm.paymentMethod === 'card' ? window.open('', '_blank') : null
+    let result
+    try {
+      result = await subscribe.mutateAsync({
+        billingDay: day,
+        billingPeriod: subscribeForm.billingPeriod,
+        paymentMethod: subscribeForm.paymentMethod,
+        termsAccepted: true,
+      })
+    } catch {
+      if (newTab) newTab.close()
+      return
+    }
     setShowSubscribeModal(false)
-    toast.success('Adesão gerada! Pague abaixo pra ativar seu plano.')
+
+    if (result?.method === 'card') {
+      if (!result.checkoutUrl) {
+        if (newTab) newTab.close()
+        toast.error('Não foi possível gerar o link de pagamento. Tente pelo botão "Cartão" abaixo.')
+        return
+      }
+      if (newTab) newTab.location.href = result.checkoutUrl
+      else window.location.href = result.checkoutUrl
+      toast.success('Abrimos o pagamento por cartão. Depois de pagar, a ativação é automática.')
+      return
+    }
+    if (newTab) newTab.close()
+
+    if (result?.method === 'none' || result?.activated) {
+      toast.success('Assinatura ativada!')
+      return
+    }
+    setShowPix(true)
+    toast.success('Adesão gerada! Pague o Pix abaixo para ativar seu plano.')
   }
 
   const handleShowPix = async () => {
@@ -83,9 +116,13 @@ export default function FinanceiroPage() {
     setShowPix(true)
   }
 
-  const copyPixCode = () => {
-    navigator.clipboard.writeText(pendingBilling.pixCode)
-    toast.success('Código Pix copiado!')
+  const copyPixCode = async () => {
+    try {
+      await navigator.clipboard.writeText(pendingBilling.pixCode)
+      toast.success('Código Pix copiado!')
+    } catch {
+      toast.error('Não foi possível copiar. Selecione o código e copie manualmente.')
+    }
   }
 
   const handleCardPayment = async () => {
@@ -111,15 +148,6 @@ export default function FinanceiroPage() {
       if (newTab) newTab.close()
     }
   }
-/*function assinatura(){
-const str='';
-  if(subscription === subscription?.status === 'trial'){
-  str='Avaliação Gratuita';
-  }else{
-  str='Plano Beta';
-  }
-  return str;
-}*/
   return (
     <div>
       <TopBar title="Assinatura Eu Cardápio" subtitle="Sua assinatura e pagamentos" back />
@@ -130,12 +158,18 @@ const str='';
             <AlertTriangle size={20} className="text-danger flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold text-danger">
-                {subscription.status === 'suspended' ? 'Assinatura suspensa' : 'Pagamento pendente'}
+                {subscription.status === 'suspended'
+                  ? 'Acesso pausado'
+                  : trialEnded ? 'Seu período de teste terminou' : 'Pagamento pendente'}
               </p>
               <p className="text-xs text-gray-600 mt-1">
                 {subscription.status === 'suspended'
-                  ? 'O WhatsApp foi desconectado e o cardápio está bloqueado até a confirmação do pagamento.'
-                  : 'Regularize o pagamento abaixo para evitar a suspensão do WhatsApp e do cardápio.'}
+                  ? (trialEnded
+                    ? 'Seus dados continuam guardados. Assine o plano para liberar o acesso de novo — a liberação é automática após o pagamento.'
+                    : 'O WhatsApp foi desconectado e o cardápio está bloqueado até a confirmação do pagamento. A liberação é automática após o pagamento.')
+                  : trialEnded
+                    ? 'Você continua usando normalmente durante a carência. Assine o plano para não ter o acesso pausado.'
+                    : 'Você continua usando normalmente durante a carência. Pague abaixo para evitar a pausa do WhatsApp e do cardápio.'}
               </p>
             </div>
           </div>
@@ -143,7 +177,7 @@ const str='';
 
         <Card>
           <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-sm">{subscription?.status === 'trial' ? 'Avaliação Gratuita' : 'Plano Beta'}</h3>
+            <h3 className="font-semibold text-sm">{isTrial ? 'Avaliação gratuita' : `Plano ${plan?.name || 'Eu Cardápio'}`}</h3>
             <Badge status={subscription?.status} />
           </div>
           {subscription?.currentPeriodEnd && (
@@ -152,10 +186,17 @@ const str='';
             </p>
           )}
           {isTrial && subscription?.trialEndsAt && (
+            <p className="text-xs text-gray-400 mt-1">
+              {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Falta${trialDaysLeft === 1 ? '' : 'm'} ${trialDaysLeft} dia${trialDaysLeft === 1 ? '' : 's'} de avaliação`} — até {formatDate(subscription.trialEndsAt)}
+            </p>
+          )}
+          {showSubscribe && (
             <>
-              <p className="text-xs text-gray-400 mt-1">
-                {trialDaysLeft <= 0 ? 'Sua avaliação expira hoje' : `Falta${trialDaysLeft === 1 ? '' : 'm'} ${trialDaysLeft} dia${trialDaysLeft === 1 ? '' : 's'} de avaliação`} — até {formatDate(subscription.trialEndsAt)}
-              </p>
+              {trialEnded && plan?.monthlyPrice > 0 && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Assine por {formatCurrency(plan.monthlyPrice)}/mês e continue com tudo o que você já cadastrou — Pix ou cartão.
+                </p>
+              )}
               <Button full className="mt-3" onClick={() => setShowSubscribeModal(true)}>
                 Assinar plano
               </Button>
@@ -358,9 +399,9 @@ const str='';
           </p>
           <p>
             <strong>4. Atraso e suspensão.</strong> Em caso de não pagamento até a data de vencimento, o
-            restaurante entra em período de carência, durante o qual o acesso permanece ativo. Após esse
-            período sem regularização, o acesso ao WhatsApp e ao cardápio digital será suspenso
-            automaticamente, sem prejuízo da cobrança devida.
+            restaurante entra em período de carência{plan?.gracePeriodDays > 0 ? ` de ${plan.gracePeriodDays} dia${plan.gracePeriodDays === 1 ? '' : 's'}` : ''},
+            durante o qual o acesso permanece ativo normalmente. Após esse período sem regularização, o acesso
+            ao painel, ao WhatsApp e ao cardápio digital é pausado automaticamente, sem prejuízo da cobrança devida.
           </p>
           <p>
             <strong>5. Reativação.</strong> O acesso é restabelecido automaticamente assim que o pagamento
@@ -368,8 +409,8 @@ const str='';
           </p>
           <p>
             <strong>6. Cancelamento.</strong> O restaurante pode solicitar o cancelamento a qualquer momento,
-            sem multas, ficando o acesso disponível até o fim do período já pago. Assinaturas canceladas e
-            não excluídas manualmente são removidas do sistema automaticamente após 15 dias.
+            sem multas. O cancelamento encerra o acesso ao sistema imediatamente (painel, WhatsApp e cardápio
+            digital), e os dados do restaurante são excluídos definitivamente 15 dias após o cancelamento.
           </p>
           <p>
             <strong>7. Alterações de plano ou valores.</strong> Eventuais alterações de preço serão

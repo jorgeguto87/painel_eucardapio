@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MapPin, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TopBar from '../../components/layout/TopBar'
@@ -6,6 +7,7 @@ import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import useRestaurantStore from '../../stores/restaurantStore'
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard'
 
 export default function RestaurantProfilePage() {
   const { restaurant, fetchRestaurant, updateRestaurant } = useRestaurantStore()
@@ -16,12 +18,17 @@ export default function RestaurantProfilePage() {
   })
   const [locating, setLocating] = useState(false)
   const [saving, setSaving]     = useState(false)
+  // Snapshot do que está salvo — pra avisar antes de sair com alterações.
+  const [baseline, setBaseline] = useState(null)
+  const navigate = useNavigate()
+  const isDirty = baseline !== null && JSON.stringify(form) !== baseline
+  const confirmLeave = useUnsavedChangesGuard(isDirty)
 
   useEffect(() => { if (!restaurant) fetchRestaurant() }, [restaurant, fetchRestaurant])
 
   useEffect(() => {
     if (restaurant) {
-      setForm({
+      const loaded = {
         name:     restaurant.name || '',
         phone:    restaurant.phone || '',
         document: restaurant.document || '',
@@ -29,7 +36,9 @@ export default function RestaurantProfilePage() {
         askForDisposables: restaurant.askForDisposables !== false,
         latitude:  restaurant.latitude ?? null,
         longitude: restaurant.longitude ?? null,
-      })
+      }
+      setForm(loaded)
+      setBaseline(JSON.stringify(loaded))
     }
   }, [restaurant])
 
@@ -77,6 +86,7 @@ export default function RestaurantProfilePage() {
         latitude:  form.latitude,
         longitude: form.longitude,
       })
+      setBaseline(JSON.stringify(form))
       toast.success('Dados atualizados!')
     } catch {
       toast.error('Erro ao salvar.')
@@ -87,7 +97,7 @@ export default function RestaurantProfilePage() {
 
   return (
     <div>
-      <TopBar title="Dados do restaurante" back />
+      <TopBar title="Dados do restaurante" back onBack={() => { if (confirmLeave()) navigate(-1) }} />
 
       <form onSubmit={handleSubmit} className="page space-y-4">
         <Input label="Nome do restaurante" value={form.name} onChange={handleChange('name')} required />

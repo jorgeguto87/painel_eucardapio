@@ -13,7 +13,23 @@ export const isCicloCurto = (order) => {
 export const needsDelivery = (order) => !!order.deliveryAddress?.street
 export const isOpenOrder = (order) => order.status !== 'finalizado' && order.status !== 'cancelado'
 
+// Pagamento online (Pix/cartão pelo gateway). Enquanto o pedido está
+// "recebido", o pagamento AINDA NÃO foi aprovado — o servidor recusa
+// iniciar o preparo nesse caso (e confere no provedor antes de recusar).
+export const ONLINE_PAYMENT_METHODS = ['pix', 'credit_card', 'debit_card']
+export const isAwaitingOnlinePayment = (order) =>
+  ONLINE_PAYMENT_METHODS.includes(order.paymentMethod) && order.status === 'recebido'
+
+// Texto único de confirmação de cancelamento — o servidor não deixa
+// reabrir pedido cancelado, então o aviso é verdadeiro.
+export const CANCEL_CONFIRM_TEXT =
+  'Cancelar este pedido? Um pedido cancelado não pode ser reaberto. ' +
+  'O cashback e o cupom usados voltam para o cliente; pagamento online já aprovado precisa ser estornado no painel do provedor.'
+
 export function primaryAction(order) {
+  if (isAwaitingOnlinePayment(order)) {
+    return { kind: 'awaiting_payment', label: 'Aguardando pagamento', variant: 'muted' }
+  }
   if (['recebido', 'pago'].includes(order.status)) {
     return { kind: 'start_prep', label: 'Iniciar preparo', variant: 'primary' }
   }
@@ -38,6 +54,7 @@ export function primaryAction(order) {
 const VARIANT_CLASS = {
   primary:   'bg-primary text-white hover:brightness-105',
   secondary: 'bg-secondary text-white hover:brightness-110',
+  muted:     'bg-gray-100 text-gray-500 cursor-not-allowed',
 }
 
 export default function PrimaryActionButton({ order, size = 'md', className = '' }) {
@@ -49,6 +66,14 @@ export default function PrimaryActionButton({ order, size = 'md', className = ''
   const base = `inline-flex items-center justify-center rounded-lg font-semibold transition-all active:scale-[0.98] whitespace-nowrap disabled:opacity-50 ${
     size === 'lg' ? 'h-10 px-4 text-sm' : 'h-9 px-3 text-sm'
   } ${VARIANT_CLASS[action.variant]} ${className}`
+
+  if (action.kind === 'awaiting_payment') {
+    return (
+      <button type="button" className={base} disabled title="O pagamento online ainda não foi confirmado pelo provedor." onClick={(e) => e.stopPropagation()}>
+        {action.label}
+      </button>
+    )
+  }
 
   if (action.kind === 'assign_courier') {
     return (

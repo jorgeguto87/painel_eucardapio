@@ -41,4 +41,24 @@ export const formatDateTime = (date) => {
   })
 }
 
+/**
+ * Datas de "vencimento" (cupom, cashback) são definidas no horário de
+ * Brasília — formatamos sempre nesse fuso, não no do navegador.
+ */
+export const BUSINESS_TZ = 'America/Sao_Paulo'
+
+/** Data → "AAAA-MM-DD" no fuso de São Paulo (valor pra <input type="date">). */
+export const toBusinessDateInput = (date) => {
+  if (!date) return ''
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('en-CA', { timeZone: BUSINESS_TZ })
+}
+
+/** Data → "dd/mm/aaaa" no fuso de São Paulo. */
+export const formatBusinessDate = (date) => {
+  if (!date) return '—'
+  return new Date(date).toLocaleDateString('pt-BR', { timeZone: BUSINESS_TZ })
+}
+
 export const formatShortId = (id = '') => id.slice(-6).toUpperCase()

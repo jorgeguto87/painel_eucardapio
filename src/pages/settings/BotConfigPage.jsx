@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import TopBar from '../../components/layout/TopBar'
 import Button from '../../components/ui/Button'
@@ -6,6 +7,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import ImageUploadField from '../../components/media/ImageUploadField'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../config/api'
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard'
 
 const useBotConfig = () =>
   useQuery({
@@ -37,8 +39,19 @@ export default function BotConfigPage() {
   const update = useUpdateBotConfig()
 
   const [form, setForm] = useState(null)
+  const navigate = useNavigate()
 
   useEffect(() => { if (config) setForm(config) }, [config])
+
+  // Alterações não salvas (textos e imagem de boas-vindas) — avisa antes de sair.
+  const pick = (v) => JSON.stringify({
+    welcomeMessage: v?.welcomeMessage || '',
+    welcomeImageBase64: v?.welcomeImageBase64 || null,
+    awayMessage: v?.awayMessage || '',
+    openingMessage: v?.openingMessage || '',
+  })
+  const isDirty = !!form && !!config && pick(form) !== pick(config)
+  const confirmLeave = useUnsavedChangesGuard(isDirty)
 
   if (isLoading || !form) return <LoadingSpinner />
 
@@ -56,7 +69,7 @@ export default function BotConfigPage() {
 
   return (
     <div>
-      <TopBar title="Mensagens do bot" back />
+      <TopBar title="Mensagens do bot" back onBack={() => { if (confirmLeave()) navigate(-1) }} />
 
       <form onSubmit={handleSubmit} className="page space-y-4">
         <ImageUploadField

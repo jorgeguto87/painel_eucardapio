@@ -14,7 +14,7 @@ import {
   useCashbackConfig, useUpdateCashbackConfig,
 } from '../../hooks/useLoyalty'
 import { useProducts, useProductCategories } from '../../hooks/useProducts'
-import { formatCurrency, toCents, toReais } from '../../utils/format'
+import { formatCurrency, toCents, toReais, toBusinessDateInput, formatBusinessDate } from '../../utils/format'
 
 const TABS = [
   { key: 'coupons',  label: 'Cupons',  icon: Ticket },
@@ -104,7 +104,7 @@ function CouponsTab() {
       usesMinOrder: !!c.minOrderValue,
       minOrderValue: c.minOrderValue ? toReais(c.minOrderValue) : '',
       stackableWithCashback: c.stackableWithCashback,
-      expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '',
+      expiresAt: toBusinessDateInput(c.expiresAt),
       maxUses: c.maxUses || '',
     })
     setEditingId(c._id)
@@ -123,7 +123,10 @@ function CouponsTab() {
       applicableProducts: form.usesProducts ? form.applicableProducts : [],
       stackableWithCashback: form.stackableWithCashback,
       minOrderValue: form.usesMinOrder && form.minOrderValue ? toCents(form.minOrderValue) : 0,
-      expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+      // Só a data (AAAA-MM-DD): o servidor transforma em "até 23:59:59 de
+      // Brasília". Antes ia new Date('AAAA-MM-DD') = meia-noite UTC, e o
+      // cupom vencia às 21h do DIA ANTERIOR.
+      expiresAt: form.expiresAt || null,
       maxUses: form.maxUses ? Number(form.maxUses) : null,
     }
     const onSuccess = () => setModalOpen(false)
@@ -155,7 +158,7 @@ function CouponsTab() {
                     {c.type === 'percentage' && ` — ${c.discountValue}%`}
                     {c.type === 'fixed' && ` — ${formatCurrency(c.discountValue)}`}
                   </p>
-                  {c.expiresAt && <p className="text-xs text-gray-400 mt-0.5">Vence em {new Date(c.expiresAt).toLocaleDateString('pt-BR')}</p>}
+                  {c.expiresAt && <p className="text-xs text-gray-400 mt-0.5">Vence em {formatBusinessDate(c.expiresAt)}</p>}
                   <p className="text-xs text-gray-400 mt-0.5">{c.usedCount} uso(s)</p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">

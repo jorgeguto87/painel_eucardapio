@@ -99,8 +99,21 @@ export default function PaymentsPage() {
   useEffect(() => { if (config) setForm(config) }, [config])
 
   useEffect(() => {
-    if (searchParams.get('connected') === 'true') {
+    const connected = searchParams.get('connected')
+    if (connected === 'true') {
       toast.success('Conta de pagamento conectada com sucesso!')
+    } else if (connected === 'false') {
+      // O callback OAuth agora volta pra cá com o motivo em vez de mostrar
+      // um JSON de erro cru no navegador.
+      const code = searchParams.get('error')
+      const messages = {
+        OAUTH_STATE_EXPIRED: 'O link de conexão expirou. Clique em conectar de novo.',
+        OAUTH_STATE_INVALID: 'Link de conexão inválido. Clique em conectar de novo a partir deste painel.',
+        OAUTH_USER_NOT_ALLOWED: 'Seu usuário não tem permissão para conectar pagamentos neste restaurante.',
+        AUTHORIZATION_DENIED: 'A autorização foi cancelada ou recusada no provedor.',
+        INVALID_CALLBACK: 'O provedor não devolveu os dados da autorização. Tente de novo.',
+      }
+      toast.error(messages[code] || 'Não foi possível conectar a conta de pagamento. Tente de novo.')
     }
   }, [searchParams])
 

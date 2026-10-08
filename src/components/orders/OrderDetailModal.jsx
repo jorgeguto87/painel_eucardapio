@@ -7,7 +7,7 @@ import { formatCurrency, formatShortId, formatDateTime } from '../../utils/forma
 import Badge from '../ui/Badge'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
-import PrimaryActionButton, { needsDelivery, isOpenOrder } from './PrimaryActionButton'
+import PrimaryActionButton, { needsDelivery, isOpenOrder, CANCEL_CONFIRM_TEXT } from './PrimaryActionButton'
 import CourierPickerModal from './CourierPickerModal'
 
 const PAYMENT_LABELS = {
@@ -110,7 +110,7 @@ function OrderDetailBody({ order, printStatus, deliverers, confirmManualPix, can
   const canPrint = printStatus?.isLinked && printStatus.printers?.length > 0
 
   const handleCancel = () => {
-    if (window.confirm('Cancelar este pedido? Essa ação não pode ser desfeita.')) {
+    if (window.confirm(CANCEL_CONFIRM_TEXT)) {
       cancelOrder.mutate(order._id, { onSuccess: onClose })
     }
   }

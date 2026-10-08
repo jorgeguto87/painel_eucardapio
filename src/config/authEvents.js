@@ -8,6 +8,7 @@
 
 const logoutListeners  = new Set()
 const refreshListeners = new Set()
+const subscriptionListeners = new Set()
 
 export const authEvents = {
   onForceLogout: (callback) => {
@@ -29,5 +30,15 @@ export const authEvents = {
   },
   emitTokensRefreshed: (accessToken, refreshToken) => {
     refreshListeners.forEach((cb) => cb(accessToken, refreshToken))
+  },
+
+  // Assinatura bloqueada (HTTP 402 SUBSCRIPTION_REQUIRED) — quem escuta
+  // decide como avisar/redirecionar.
+  onSubscriptionRequired: (callback) => {
+    subscriptionListeners.add(callback)
+    return () => subscriptionListeners.delete(callback)
+  },
+  emitSubscriptionRequired: (info) => {
+    subscriptionListeners.forEach((cb) => cb(info))
   },
 }

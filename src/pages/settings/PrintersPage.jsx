@@ -47,9 +47,16 @@ export default function PrintersPage() {
   const countdown = useCountdown(status?.pairingCodeExpiresAt)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
-  const copyCode = () => {
-    navigator.clipboard.writeText(status.pairingCode)
-    toast.success('Código copiado!')
+  // clipboard pode falhar (HTTP sem TLS, permissão negada, navegador antigo)
+  // — antes mostrava "copiado" mesmo sem copiar nada.
+  const copyCode = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard indisponível')
+      await navigator.clipboard.writeText(status.pairingCode)
+      toast.success('Código copiado!')
+    } catch {
+      toast.error('Não foi possível copiar. Selecione o código e copie manualmente.')
+    }
   }
 
   const confirmarNovoCodigo = () => {

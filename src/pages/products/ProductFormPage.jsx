@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Trash2, ChevronDown, Check, Plus, X, GripVertical, Info, Sparkles,
@@ -244,6 +245,16 @@ function PainelOpcionaisVariante({
   )
 }
 
+// Retrato serializável do formulário (sem as chaves internas _key) — usado
+// pra saber se há alterações não salvas.
+const snapshotOf = (form, grupos) => JSON.stringify({
+  form,
+  grupos: (grupos || []).map(({ _key, options, ...g }) => ({
+    ...g,
+    options: (options || []).map(({ _key: _k, ...o }) => o),
+  })),
+})
+
 export default function ProductFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -282,12 +293,22 @@ export default function ProductFormPage() {
 
   const [gruposVariacao, setGruposVariacao] = useState([])
 
+  // Retrato do formulário como estava ao carregar/salvar — comparado com o
+  // estado atual pra detectar alterações não salvas.
+  const baselineRef = useRef(null)
+  // Id já carregado no formulário: um refetch da lista de produtos (foco na
+  // aba, invalidação depois de salvar outra coisa) NÃO pode mais sobrescrever
+  // o que o usuário está digitando.
+  const loadedIdRef = useRef(undefined)
+
   useEffect(() => {
     if (isEditing && grouped) {
+      if (loadedIdRef.current === id) return
       const allProducts = Object.values(grouped).flat()
       const product = allProducts.find((p) => p._id === id)
       if (product) {
-        setForm({
+        loadedIdRef.current = id
+        const loadedForm = {
           name: product.name,
           description: product.description || '',
           price: formatarPrecoParaInput(product.price),
@@ -298,9 +319,8 @@ export default function ProductFormPage() {
           opcionaisIds: (product.opcionaisIds || []).map((o) => o._id || o),
           adicionaisIds: (product.adicionaisIds || []).map((a) => a._id || a),
           opcionalRules: product.opcionalRules || [],
-        })
-        setGruposVariacao(
-          (product.variantGroups || []).map((g) => ({
+        }
+        const loadedGrupos = (product.variantGroups || []).map((g) => ({
             _key: crypto.randomUUID(), name: g.name,
             options: (g.options || []).map((o) => ({
               _key: crypto.randomUUID(), name: o.name, price: formatarPrecoParaInput(o.price),
@@ -310,17 +330,25 @@ export default function ProductFormPage() {
               })),
             })),
           }))
-        )
+        setForm(loadedForm)
+        setGruposVariacao(loadedGrupos)
+        baselineRef.current = snapshotOf(loadedForm, loadedGrupos)
         if (product.imageUrl) setImageMode('url')
       }
-    } else if (!isEditing) {
-      setForm({
+    } else if (!isEditing && loadedIdRef.current !== 'new') {
+      loadedIdRef.current = 'new'
+      const emptyForm = {
         name: '', description: '', price: '', category: 'Geral', imageUrl: '', imageBase64: '',
         pricingMode: 'simple', opcionaisIds: [], adicionaisIds: [], opcionalRules: [],
-      })
+      }
+      setForm(emptyForm)
       setGruposVariacao([])
+      baselineRef.current = snapshotOf(emptyForm, [])
     }
   }, [isEditing, grouped, id])
+
+  const isDirty = baselineRef.current !== null && snapshotOf(form, gruposVariacao) !== baselineRef.current
+  const confirmLeave = useUnsavedChangesGuard(isDirty)
 
   const handleChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
@@ -652,6 +680,8 @@ export default function ProductFormPage() {
     } else {
       await createProduct.mutateAsync(payload)
     }
+    // Salvo → o retrato atual vira a nova referência (sem aviso ao sair)
+    baselineRef.current = snapshotOf(form, gruposVariacao)
     setSalvo(true)
     setTimeout(() => setSalvo(false), 2600)
     if (!isEditing) navigate('/products')
@@ -660,6 +690,7 @@ export default function ProductFormPage() {
   const handleDelete = async () => {
     if (!confirm(`Remover "${form.name}" do cardápio? Essa ação não pode ser desfeita.`)) return
     await deleteProduct.mutateAsync(id)
+    baselineRef.current = null // removido — nada a salvar
     navigate('/products')
   }
 
@@ -674,6 +705,7 @@ export default function ProductFormPage() {
         title={isEditing ? 'Editar produto' : 'Novo produto'}
         subtitle={form.name || 'Produto sem nome'}
         back
+        onBack={() => { if (confirmLeave()) navigate(-1) }}
         right={
           <Button onClick={handleSubmit} loading={isSaving} className="min-w-[120px]">
             {salvo ? <Check size={16} /> : <Save size={16} />}

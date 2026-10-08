@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Bike, History, Printer } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
-import { useOrders } from '../../hooks/useOrders'
+import { useOpenOrders } from '../../hooks/useOrders'
 import { usePrintAgentStatus, useSetAutoPrintRoles, PRINTER_ROLE_LABELS } from '../../hooks/usePrintAgent'
 import { OrderCard, OrderRow } from '../../components/orders/OrderCard'
 import { TypeFilterBar, StatusFilterBar } from '../../components/orders/FilterBar'
@@ -62,16 +62,20 @@ export default function OrdersPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [now, setNow] = useState(Date.now())
 
-  const { data, isLoading } = useOrders(status || undefined, type || undefined)
-  const orders = (data?.data || []).slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+  // Quadro = TODOS os pedidos em aberto (sem paginação). O filtro de status
+  // é aplicado aqui mesmo, pela coluna do quadro — "Recebido" inclui os
+  // "pago" (ainda não entraram em preparo).
+  const { data, isLoading } = useOpenOrders(type || undefined)
+  const allOpen = (data || []).slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+  const orders = status ? allOpen.filter((o) => boardColumn(o) === status) : allOpen
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000)
     return () => clearInterval(t)
   }, [])
 
-  const activeCount = orders.filter((o) => !['finalizado', 'cancelado'].includes(o.status)).length
-  const onRoute = orders.filter((o) => o.status === 'saiu_entrega').length
+  const activeCount = allOpen.length
+  const onRoute = allOpen.filter((o) => o.status === 'saiu_entrega').length
 
   return (
     <div>

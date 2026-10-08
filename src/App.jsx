@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from 'react-hot-toast'
+import toast, { Toaster } from 'react-hot-toast'
+import { authEvents } from './config/authEvents'
+import { SUBSCRIPTION_NOTICE_KEY } from './config/api'
 
 import AppShell from './components/layout/AppShell'
 import ProtectedRoute from './components/layout/ProtectedRoute'
@@ -46,6 +49,29 @@ const queryClient = new QueryClient({
 })
 
 
+/**
+ * Aviso de assinatura bloqueada (HTTP 402 SUBSCRIPTION_REQUIRED). O
+ * interceptor (config/api.js) leva o admin para /financeiro e guarda a
+ * mensagem aqui pra exibir depois do redirecionamento; para a equipe
+ * (operator), que não acessa o financeiro, só mostra o aviso.
+ */
+function SubscriptionNotice() {
+  useEffect(() => {
+    try {
+      const pending = window.sessionStorage.getItem(SUBSCRIPTION_NOTICE_KEY)
+      if (pending) {
+        window.sessionStorage.removeItem(SUBSCRIPTION_NOTICE_KEY)
+        toast.error(pending, { id: 'subscription-required', duration: 8000 })
+      }
+    } catch { /* sem storage */ }
+
+    return authEvents.onSubscriptionRequired(({ message }) => {
+      toast.error(message, { id: 'subscription-required', duration: 8000 })
+    })
+  }, [])
+  return null
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -75,7 +101,7 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/settings/profile" element={<RequireAdmin><RestaurantProfilePage /></RequireAdmin>} />
             <Route path="/settings/bot" element={<RequireAdmin><BotConfigPage /></RequireAdmin>} />
-            <Route path="/settings/hours" element={<BusinessHoursPage />} />
+            <Route path="/settings/hours" element={<RequireAdmin><BusinessHoursPage /></RequireAdmin>} />
             <Route path="/settings/payments" element={<RequireAdmin><PaymentsPage /></RequireAdmin>} />
             <Route path="/settings/printers" element={<RequireAdmin><PrintersPage /></RequireAdmin>} />
             <Route path="/settings/deliverers" element={<DeliverersPage />} />
@@ -93,6 +119,7 @@ export default function App() {
       </BrowserRouter>
 
       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+      <SubscriptionNotice />
     </QueryClientProvider>
   )
 }
