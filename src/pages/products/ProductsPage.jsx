@@ -10,6 +10,7 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Modal from '../../components/ui/Modal'
 import Button from '../../components/ui/Button'
+import RestaurantLogoCard from '../../components/products/RestaurantLogoCard'
 import {
   useProducts, useToggleProduct, useProductCategories,
   useCreateCategory, useUpdateCategory, useDeleteCategory, useReorderCategories, useReorderProducts,
@@ -557,6 +558,8 @@ export default function ProductsPage() {
       />
 
       <div className="page">
+        <RestaurantLogoCard />
+
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => navigate('/products/opcionais-adicionais')}

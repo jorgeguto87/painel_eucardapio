@@ -6,6 +6,7 @@ import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Badge from '../../components/ui/Badge'
 import NoticeBanner from '../../components/notices/NoticeBanner'
+import CardapioLinkCard from '../../components/dashboard/CardapioLinkCard'
 import { useOrders, useTodaySummary } from '../../hooks/useOrders'
 import { useWhatsappStatus } from '../../hooks/useWhatsapp'
 import { useMyBilling } from '../../hooks/useBilling'
@@ -107,6 +108,8 @@ export default function DashboardPage() {
         >
           <PlusCircle size={18} /> Novo pedido — Balcão
         </button>
+
+        <CardapioLinkCard baseUrl={CARDAPIO_URL} slug={restaurant?.slug} restaurantName={restaurant?.name} />
 
         {/* Assinatura vencida/suspensa */}
         {(isPastDue || isSuspended) && (
