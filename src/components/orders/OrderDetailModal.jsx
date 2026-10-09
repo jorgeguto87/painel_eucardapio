@@ -9,11 +9,22 @@ import Button from '../ui/Button'
 import Modal from '../ui/Modal'
 import PrimaryActionButton, { needsDelivery, isOpenOrder, CANCEL_CONFIRM_TEXT } from './PrimaryActionButton'
 import CourierPickerModal from './CourierPickerModal'
+import PaymentAlertBadge, { orderRefTime } from './PaymentAlertBadge'
+
+const ONLINE_METHODS = ['pix', 'credit_card', 'debit_card']
 
 const PAYMENT_LABELS = {
   pix: 'PIX', credit_card: 'Cartão de crédito (online)', debit_card: 'Cartão de débito (online)',
   cash_on_delivery: 'Pagamento na entrega', pix_manual: 'Pix com chave',
 }
+// InfinitePay é um checkout único (Pix ou cartão escolhido lá dentro) — o
+// paymentMethod gravado não diz qual foi, então mostra "Online (InfinitePay)".
+// paymentProvider vem do backend (pedidos antigos não têm → rótulo padrão).
+const paymentMethodLabel = (order) => (
+  order.paymentProvider === 'infinitepay' && ONLINE_METHODS.includes(order.paymentMethod)
+    ? 'Online (InfinitePay)'
+    : PAYMENT_LABELS[order.paymentMethod]
+)
 const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)', voucher: 'Voucher (VR/VA, Ticket Alimentação)' }
 const DELIVERY_STAGE_LABELS = { fila: 'Na fila', proxima: 'Próxima entrega', no_local: 'No local', entregue: 'Entregue' }
 
@@ -125,7 +136,7 @@ function OrderDetailBody({ order, printStatus, deliverers, confirmManualPix, can
               <span className="font-bold text-3xl leading-none tracking-tight text-secondary">#{formatShortId(order._id)}</span>
               <Badge status={order.status} />
             </div>
-            <div className="mt-2 text-sm text-gray-500">{formatDateTime(order.createdAt)}</div>
+            <div className="mt-2 text-sm text-gray-500">{formatDateTime(orderRefTime(order))}</div>
           </div>
           <div className="flex flex-col items-end gap-2">
             {isAwaitingManualPix && (
@@ -137,6 +148,12 @@ function OrderDetailBody({ order, printStatus, deliverers, confirmManualPix, can
           </div>
         </div>
       </div>
+
+      {order.paymentAlert && (
+        <div className="px-5 pt-4">
+          <PaymentAlertBadge alert={order.paymentAlert} size="lg" showMessage />
+        </div>
+      )}
 
       <div className="grid md:grid-cols-5 gap-4 px-5 py-4">
         {/* Coluna esquerda */}
@@ -177,12 +194,19 @@ function OrderDetailBody({ order, printStatus, deliverers, confirmManualPix, can
           </Section>
 
           <Section title="Pagamento">
-            <p className="text-sm">{PAYMENT_LABELS[order.paymentMethod]}</p>
-            {order.deliveryPaymentMethod && (
+            <p className="text-sm">{paymentMethodLabel(order)}</p>
+            {order.paymentMethod === 'cash_on_delivery' && order.deliveryPaymentMethod && (
               <p className="text-sm text-gray-500 mt-1">
                 {DELIVERY_PAYMENT_LABELS[order.deliveryPaymentMethod]}
                 {order.paymentMethod === 'cash_on_delivery' && (hasAddress ? ' — na entrega' : ' — no balcão')}
               </p>
+            )}
+            {ONLINE_METHODS.includes(order.paymentMethod) && !order.paidAtCreation && (
+              order.status === 'recebido' && order.paymentId?.status !== 'approved' ? (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-amber-600">⏳ Aguardando pagamento online</p>
+              ) : order.status !== 'cancelado' ? (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">✅ Pago online — não cobrar do cliente</p>
+              ) : null
             )}
             {order.paidAtCreation && (
               <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">✅ Já pago no balcão</p>

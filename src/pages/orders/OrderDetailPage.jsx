@@ -12,11 +12,22 @@ import { isAwaitingOnlinePayment, CANCEL_CONFIRM_TEXT } from '../../components/o
 import { useOrder, useCancelOrder, useUpdateOrderStatus, useConfirmManualPix } from '../../hooks/useOrders'
 import { usePrintAgentStatus, usePrintOrder, PRINTER_ROLE_LABELS } from '../../hooks/usePrintAgent'
 import { formatCurrency, formatShortId, formatDateTime } from '../../utils/format'
+import PaymentAlertBadge, { orderRefTime } from '../../components/orders/PaymentAlertBadge'
+
+const ONLINE_METHODS = ['pix', 'credit_card', 'debit_card']
 
 const PAYMENT_LABELS = {
   pix: 'PIX', credit_card: 'Cartão de crédito (online)', debit_card: 'Cartão de débito (online)',
   cash_on_delivery: 'Pagamento na entrega', pix_manual: 'Pix com chave',
 }
+// InfinitePay é um checkout único (Pix ou cartão escolhido lá dentro) — o
+// paymentMethod gravado não diz qual foi, então mostra "Online (InfinitePay)".
+// paymentProvider vem do backend (pedidos antigos não têm → rótulo padrão).
+const paymentMethodLabel = (order) => (
+  order.paymentProvider === 'infinitepay' && ONLINE_METHODS.includes(order.paymentMethod)
+    ? 'Online (InfinitePay)'
+    : PAYMENT_LABELS[order.paymentMethod]
+)
 
 const DELIVERY_PAYMENT_LABELS = { cash: 'Dinheiro', debit: 'Débito (maquininha)', credit: 'Crédito (maquininha)', voucher: 'Voucher (VR/VA, Ticket Alimentação)' }
 
@@ -108,9 +119,10 @@ export default function OrderDetailPage() {
 
   return (
     <div>
-      <TopBar title={`Pedido #${formatShortId(order._id)}`} subtitle={formatDateTime(order.createdAt)} back />
+      <TopBar title={`Pedido #${formatShortId(order._id)}`} subtitle={formatDateTime(orderRefTime(order))} back />
 
       <div className="page space-y-4">
+        <PaymentAlertBadge alert={order.paymentAlert} size="lg" showMessage />
         {/*
           Status é só informativo aqui — pra pedidos com pagamento online,
           avança sozinho quando o Mercado Pago confirma. Daí em diante, quem
@@ -210,14 +222,21 @@ export default function OrderDetailPage() {
         {/* Pagamento */}
         <Card>
           <h3 className="font-semibold text-sm mb-2">Pagamento</h3>
-          <p className="text-sm">{PAYMENT_LABELS[order.paymentMethod]}</p>
-          {order.deliveryPaymentMethod && (
+          <p className="text-sm">{paymentMethodLabel(order)}</p>
+          {order.paymentMethod === 'cash_on_delivery' && order.deliveryPaymentMethod && (
             <p className="text-sm text-gray-500 mt-1">
               {DELIVERY_PAYMENT_LABELS[order.deliveryPaymentMethod]}
               {order.paymentMethod === 'cash_on_delivery' && (
                 isCicloCurto ? ' — no balcão' : ' — na entrega'
               )}
             </p>
+          )}
+          {ONLINE_METHODS.includes(order.paymentMethod) && !order.paidAtCreation && (
+            order.status === 'recebido' && order.paymentId?.status !== 'approved' ? (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-amber-600">⏳ Aguardando pagamento online</p>
+            ) : order.status !== 'cancelado' ? (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">✅ Pago online — não cobrar do cliente</p>
+            ) : null
           )}
           {order.paidAtCreation && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-green-600">

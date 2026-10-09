@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, History } from 'lucide-react'
 import { useOrders } from '../../hooks/useOrders'
 import { OrderRow } from './OrderCard'
+import { orderRefMs } from './PaymentAlertBadge'
 import { TypeFilterBar, StatusFilterBar, STATUS_OPTIONS_HISTORY } from './FilterBar'
 
 /** Todos os pedidos (inclusive finalizados/cancelados), filtráveis — abre
@@ -18,7 +19,7 @@ export default function HistoryModal({ open, onClose, onOpenOrder }) {
   }, [open])
 
   if (!open) return null
-  const orders = (data?.data || []).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const orders = (data?.data || []).slice().sort((a, b) => orderRefMs(b) - orderRefMs(a))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">

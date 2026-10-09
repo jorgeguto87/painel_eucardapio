@@ -4,6 +4,7 @@ import TopBar from '../../components/layout/TopBar'
 import { useOpenOrders } from '../../hooks/useOrders'
 import { usePrintAgentStatus, useSetAutoPrintRoles, PRINTER_ROLE_LABELS } from '../../hooks/usePrintAgent'
 import { OrderCard, OrderRow } from '../../components/orders/OrderCard'
+import { orderRefMs } from '../../components/orders/PaymentAlertBadge'
 import { TypeFilterBar, StatusFilterBar } from '../../components/orders/FilterBar'
 import OrderDetailModal from '../../components/orders/OrderDetailModal'
 import DeliveryQueueModal from '../../components/orders/DeliveryQueueModal'
@@ -66,7 +67,10 @@ export default function OrdersPage() {
   // é aplicado aqui mesmo, pela coluna do quadro — "Recebido" inclui os
   // "pago" (ainda não entraram em preparo).
   const { data, isLoading } = useOpenOrders(type || undefined)
-  const allOpen = (data || []).slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+  // Ordena por quando o pedido foi liberado pro restaurante (confirmedAt),
+  // não por quando o cliente abriu o checkout (Pix pago 20 min depois
+  // entra no fim da fila, não no começo).
+  const allOpen = (data || []).slice().sort((a, b) => orderRefMs(a) - orderRefMs(b))
   const orders = status ? allOpen.filter((o) => boardColumn(o) === status) : allOpen
 
   useEffect(() => {

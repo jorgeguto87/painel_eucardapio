@@ -2,6 +2,7 @@ import { formatCurrency, formatShortId } from '../../utils/format'
 import Badge from '../ui/Badge'
 import { STATUS_TONE } from './StatusBadge'
 import PrimaryActionButton from './PrimaryActionButton'
+import PaymentAlertBadge, { orderRefTime, orderRefMs } from './PaymentAlertBadge'
 
 export const channelLabel = (o) => {
   if (o.orderType === 'delivery') return 'Delivery'
@@ -18,8 +19,9 @@ export const customerLabel = (o) =>
     ? (o.customerName || 'Cliente no local')
     : (o.customerName || o.customerPhone || 'Cliente')
 
-export const elapsedLabel = (createdAt, now) => {
-  const min = Math.max(0, Math.floor((now - new Date(createdAt).getTime()) / 60000))
+// Recebe a data de referência do pedido (confirmedAt || createdAt — ver orderRefTime).
+export const elapsedLabel = (refTime, now) => {
+  const min = Math.max(0, Math.floor((now - new Date(refTime).getTime()) / 60000))
   if (min < 60) return `${min} min`
   const h = Math.floor(min / 60)
   return `${h}h ${min % 60}m`
@@ -31,7 +33,9 @@ const timeHM = (d) => new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit',
 export function OrderCard({ order, onOpen, now }) {
   const tone = STATUS_TONE[order.status] || STATUS_TONE.recebido
   const isNew = order.status === 'recebido'
-  const late = now - new Date(order.createdAt).getTime() > 25 * 60000 && order.status !== 'saiu_entrega'
+  // Atraso conta a partir de quando o pedido foi liberado pro restaurante
+  // (confirmedAt), não de quando o cliente abriu o checkout.
+  const late = now - orderRefMs(order) > 25 * 60000 && order.status !== 'saiu_entrega'
 
   return (
     <article
@@ -47,7 +51,7 @@ export function OrderCard({ order, onOpen, now }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="font-bold text-xl leading-none tracking-tight text-secondary">#{formatShortId(order._id)}</span>
           <span className={`text-[11px] font-semibold rounded px-1.5 py-0.5 tabular-nums ${late ? 'bg-danger/10 text-danger' : `${tone.soft} ${tone.text}`}`}>
-            {elapsedLabel(order.createdAt, now)}
+            {elapsedLabel(orderRefTime(order), now)}
           </span>
         </div>
         <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
@@ -59,8 +63,9 @@ export function OrderCard({ order, onOpen, now }) {
         </div>
         <div className="text-[11px] text-gray-400 truncate">
           <span translate="no">{customerLabel(order)}</span>
-          {order.customerName && order.customerPhone ? ` · ${order.customerPhone}` : ''} · {timeHM(order.createdAt)}
+          {order.customerName && order.customerPhone ? ` · ${order.customerPhone}` : ''} · {timeHM(orderRefTime(order))}
         </div>
+        <PaymentAlertBadge alert={order.paymentAlert} className="mt-1.5" />
         <div className="mt-1 font-semibold text-secondary tabular-nums">{formatCurrency(order.total)}</div>
         <PrimaryActionButton order={order} className="mt-2.5 w-full" />
       </div>
@@ -87,8 +92,9 @@ export function OrderRow({ order, onOpen, now, showStatus = true, showAction = t
           {showStatus && <Badge status={order.status} />}
         </div>
         <div className="mt-1 text-[11px] text-gray-400 truncate">
-          <span translate="no">{customerLabel(order)}</span> · {timeHM(order.createdAt)}{now ? ` · ${elapsedLabel(order.createdAt, now)}` : ''}
+          <span translate="no">{customerLabel(order)}</span> · {timeHM(orderRefTime(order))}{now ? ` · ${elapsedLabel(orderRefTime(order), now)}` : ''}
         </div>
+        <PaymentAlertBadge alert={order.paymentAlert} className="mt-1 w-fit" />
         <div className="mt-0.5 font-semibold text-sm text-secondary tabular-nums">{formatCurrency(order.total)}</div>
       </div>
       {showAction && <PrimaryActionButton order={order} className="shrink-0 px-2.5 text-xs" />}

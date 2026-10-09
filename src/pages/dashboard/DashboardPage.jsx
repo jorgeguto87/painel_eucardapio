@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import Badge from '../../components/ui/Badge'
 import NoticeBanner from '../../components/notices/NoticeBanner'
 import CardapioLinkCard from '../../components/dashboard/CardapioLinkCard'
+import PaymentAlertBadge, { orderRefMs } from '../../components/orders/PaymentAlertBadge'
 import { useOrders, useTodaySummary } from '../../hooks/useOrders'
 import { useWhatsappStatus } from '../../hooks/useWhatsapp'
 import { useMyBilling } from '../../hooks/useBilling'
@@ -80,7 +81,9 @@ export default function DashboardPage() {
 
   if (isLoading) return <LoadingSpinner />
 
-  const orders = ordersData?.data || []
+  // Mais recentes primeiro, pela hora em que o pedido foi liberado pro
+  // restaurante (confirmedAt), não pela abertura do checkout.
+  const orders = (ordersData?.data || []).slice().sort((a, b) => orderRefMs(b) - orderRefMs(a))
   const subscriptionStatus = billingData?.subscription?.status
   const isPastDue = subscriptionStatus === 'past_due'
   const isSuspended = subscriptionStatus === 'suspended'
@@ -265,6 +268,7 @@ export default function DashboardPage() {
                             ? (order.customerName || 'Cliente no local')
                             : order.customerPhone}
                       </p>
+                      <PaymentAlertBadge alert={order.paymentAlert} className="mt-1 w-fit" />
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-sm mb-1">{formatCurrency(order.total)}</p>
