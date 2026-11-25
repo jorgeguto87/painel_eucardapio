@@ -28,6 +28,7 @@ import BannersPage from './pages/settings/BannersPage'
 import OfertasPage from './pages/settings/OfertasPage'
 import BusinessHoursPage from './pages/settings/BusinessHoursPage'
 import DeliveryPage from './pages/settings/DeliveryPage'
+import ImportMenuPage from './pages/products/ImportMenuPage'
 import PaymentsPage from './pages/settings/PaymentsPage'
 import PrintersPage from './pages/settings/PrintersPage'
 import DeliverersPage from './pages/settings/DeliverersPage'
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="/products/new" element={<RequireAdmin><ProductFormPage /></RequireAdmin>} />
             <Route path="/products/opcionais-adicionais" element={<RequireAdmin><OpcionaisAdicionaisPage /></RequireAdmin>} />
             <Route path="/products/favoritos" element={<RequireAdmin><FavoritosPage /></RequireAdmin>} />
+            <Route path="/products/importar" element={<RequireAdmin><ImportMenuPage /></RequireAdmin>} />
             <Route path="/products/banners" element={<RequireAdmin><BannersPage /></RequireAdmin>} />
             <Route path="/ofertas" element={<RequireAdmin><OfertasPage /></RequireAdmin>} />
             <Route path="/products/:id" element={<RequireAdmin><ProductFormPage /></RequireAdmin>} />

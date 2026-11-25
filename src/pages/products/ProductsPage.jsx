@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
+import { Download,
   Plus, ImageOff, SlidersHorizontal, Star, Image, QrCode, ChevronDown, GripVertical,
   FolderPlus, Pencil, Check, X, Trash2, MoreVertical, Copy, FolderInput,
 } from 'lucide-react'
@@ -559,6 +559,18 @@ export default function ProductsPage() {
 
       <div className="page">
         <RestaurantLogoCard />
+
+        {/* Importar cardápio — destaque maior quando ainda não há produtos */}
+        <button
+          onClick={() => navigate('/products/importar')}
+          className={`w-full flex items-center gap-3 rounded-2xl text-left mb-4 cursor-pointer transition-colors ${!isLoading && totalProdutos === 0 ? 'p-4 bg-primary text-white shadow-[0_6px_16px_-6px_rgba(255,107,44,0.6)]' : 'p-3 border border-primary/30 bg-primary/5 text-secondary hover:bg-primary/10'}`}
+        >
+          <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${!isLoading && totalProdutos === 0 ? 'bg-white/20' : 'bg-primary text-white'}`}><Download size={20} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">Importar cardápio</span>
+            <span className={`block text-xs ${!isLoading && totalProdutos === 0 ? 'text-white/85' : 'text-gray-500'}`}>Do OlaClick, Brendi, iFood, Anota AI, foto ou PDF</span>
+          </span>
+        </button>
 
         <div className="flex gap-2 mb-4">
           <button
