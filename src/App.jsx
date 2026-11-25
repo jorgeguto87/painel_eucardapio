@@ -27,6 +27,7 @@ import BotConfigPage from './pages/settings/BotConfigPage'
 import BannersPage from './pages/settings/BannersPage'
 import OfertasPage from './pages/settings/OfertasPage'
 import BusinessHoursPage from './pages/settings/BusinessHoursPage'
+import DeliveryPage from './pages/settings/DeliveryPage'
 import PaymentsPage from './pages/settings/PaymentsPage'
 import PrintersPage from './pages/settings/PrintersPage'
 import DeliverersPage from './pages/settings/DeliverersPage'
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="/settings/profile" element={<RequireAdmin><RestaurantProfilePage /></RequireAdmin>} />
             <Route path="/settings/bot" element={<RequireAdmin><BotConfigPage /></RequireAdmin>} />
             <Route path="/settings/hours" element={<RequireAdmin><BusinessHoursPage /></RequireAdmin>} />
+            <Route path="/settings/delivery" element={<RequireAdmin><DeliveryPage /></RequireAdmin>} />
             <Route path="/settings/payments" element={<RequireAdmin><PaymentsPage /></RequireAdmin>} />
             <Route path="/settings/printers" element={<RequireAdmin><PrintersPage /></RequireAdmin>} />
             <Route path="/settings/deliverers" element={<DeliverersPage />} />

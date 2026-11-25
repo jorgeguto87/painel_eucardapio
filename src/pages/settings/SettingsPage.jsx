@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Store, MessageSquare, Clock, CreditCard, Bike, LogOut, ChevronRight, Bell, BarChart3, Wallet, UserCircle, Users, LifeBuoy, Ticket, Printer } from 'lucide-react'
+import { Store, MessageSquare, Clock, CreditCard, Bike, MapPinned, LogOut, ChevronRight, Bell, BarChart3, Wallet, UserCircle, Users, LifeBuoy, Ticket, Printer } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar'
 import Card from '../../components/ui/Card'
 import useAuthStore from '../../stores/authStore'
@@ -14,6 +14,7 @@ const ITEMS = [
   { to: '/settings/profile',    icon: Store,         label: 'Dados do restaurante', adminOnly: true },
   { to: '/settings/bot',        icon: MessageSquare, label: 'Mensagens do bot', adminOnly: true },
   { to: '/settings/hours',      icon: Clock,         label: 'Horário de funcionamento', adminOnly: true },
+  { to: '/settings/delivery',   icon: MapPinned,     label: 'Entrega (taxa e área)', adminOnly: true },
   { to: '/settings/payments',   icon: CreditCard,    label: 'Pagamentos', adminOnly: true },
   { to: '/settings/printers',   icon: Printer,       label: 'Impressoras', adminOnly: true },
   { to: '/settings/deliverers', icon: Bike,          label: 'Entregadores' },

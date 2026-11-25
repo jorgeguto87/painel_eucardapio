@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TopBar from '../../components/layout/TopBar'
 import Input from '../../components/ui/Input'
@@ -8,15 +7,17 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import useRestaurantStore from '../../stores/restaurantStore'
 import useUnsavedChangesGuard from '../../hooks/useUnsavedChangesGuard'
+import RestaurantAddressCard from '../../components/map/RestaurantAddressCard'
+
+const EMPTY_ADDRESS = { street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '' }
 
 export default function RestaurantProfilePage() {
   const { restaurant, fetchRestaurant, updateRestaurant } = useRestaurantStore()
   const [form, setForm] = useState({
     name: '', phone: '', document: '',
     averagePreparationTime: '', askForDisposables: true,
-    latitude: null, longitude: null,
+    address: EMPTY_ADDRESS, latitude: null, longitude: null,
   })
-  const [locating, setLocating] = useState(false)
   const [saving, setSaving]     = useState(false)
   // Snapshot do que está salvo — pra avisar antes de sair com alterações.
   const [baseline, setBaseline] = useState(null)
@@ -34,6 +35,7 @@ export default function RestaurantProfilePage() {
         document: restaurant.document || '',
         averagePreparationTime: restaurant.averagePreparationTime ?? '',
         askForDisposables: restaurant.askForDisposables !== false,
+        address: { ...EMPTY_ADDRESS, ...restaurant.address },
         latitude:  restaurant.latitude ?? null,
         longitude: restaurant.longitude ?? null,
       }
@@ -44,52 +46,29 @@ export default function RestaurantProfilePage() {
 
   const handleChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
-  /**
-   * Captura a localização atual via geolocalização do navegador.
-   * Usada para definir o ponto de origem do restaurante (cálculo de distância de entrega).
-   */
-  const captureLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocalização não suportada neste navegador.')
-      return
-    }
-
-    setLocating(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((f) => ({
-          ...f,
-          latitude:  pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        }))
-        setLocating(false)
-        toast.success('Localização capturada!')
-      },
-      () => {
-        setLocating(false)
-        toast.error('Não foi possível obter sua localização. Verifique as permissões.')
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    )
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const hasAddress = Object.values(form.address || {}).some((v) => String(v || '').trim())
+    if (hasAddress && !(Number.isFinite(form.latitude) && Number.isFinite(form.longitude))) {
+      toast.error('Confirme a localização do restaurante no mapa antes de salvar.')
+      return
+    }
     setSaving(true)
     try {
       await updateRestaurant({
         name:     form.name,
         phone:    form.phone,
         document: form.document,
-        averagePreparationTime: form.averagePreparationTime ? Number(form.averagePreparationTime) : null,
+        // vazio = não envia (o servidor não aceita null nesse campo)
+        ...(form.averagePreparationTime ? { averagePreparationTime: Number(form.averagePreparationTime) } : {}),
         askForDisposables: form.askForDisposables,
-        latitude:  form.latitude,
-        longitude: form.longitude,
+        address: form.address,
+        ...(Number.isFinite(form.latitude) && Number.isFinite(form.longitude) ? { latitude: form.latitude, longitude: form.longitude } : {}),
       })
       setBaseline(JSON.stringify(form))
       toast.success('Dados atualizados!')
-    } catch {
-      toast.error('Erro ao salvar.')
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Erro ao salvar.')
     } finally {
       setSaving(false)
     }
@@ -129,25 +108,10 @@ export default function RestaurantProfilePage() {
           </div>
         </Card>
 
-        <Card>
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin size={16} className="text-primary" />
-            <span className="font-medium text-sm">Localização do restaurante</span>
-          </div>
-
-          {form.latitude && form.longitude ? (
-            <p className="text-xs text-gray-500 mb-3">
-              📍 {form.latitude.toFixed(6)}, {form.longitude.toFixed(6)}
-            </p>
-          ) : (
-            <p className="text-xs text-gray-400 mb-3">Localização ainda não definida.</p>
-          )}
-
-          <Button type="button" variant="secondary" full onClick={captureLocation} loading={locating}>
-            {locating ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-            Usar localização atual
-          </Button>
-        </Card>
+        <RestaurantAddressCard
+          value={{ address: form.address, latitude: form.latitude, longitude: form.longitude }}
+          onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+        />
 
         <Button type="submit" full loading={saving}>Salvar alterações</Button>
       </form>

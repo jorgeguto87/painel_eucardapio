@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CreditCard, CheckCircle2, Wallet, Zap, Info, Landmark } from 'lucide-react'
@@ -10,7 +11,6 @@ import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import api from '../../config/api'
-import { toCents, toReais } from '../../utils/format'
 
 const usePaymentConfig = () =>
   useQuery({
@@ -85,6 +85,7 @@ const PROVIDERS = [
 ]
 
 export default function PaymentsPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { data: config, isLoading } = usePaymentConfig()
   const update = useUpdatePaymentConfig()
@@ -169,10 +170,6 @@ export default function PaymentsPage() {
       acceptsCardOnDelivery: form.acceptsCardOnDelivery,
       acceptsManualPix:      form.acceptsManualPix,
       manualPixKey:          (form.manualPixKeyInput ?? form.manualPixKey ?? '').trim() || null,
-      deliveryFee:           toCents(form.deliveryFeeInput ?? toReais(form.deliveryFee)),
-      freeDeliveryAbove:     form.freeDeliveryAboveInput
-        ? toCents(form.freeDeliveryAboveInput)
-        : form.freeDeliveryAbove,
     })
   }
 
@@ -294,22 +291,9 @@ export default function PaymentsPage() {
           )}
         </Card>
 
-        <Card>
-          <h3 className="font-semibold text-sm mb-3">Taxa de entrega</h3>
-          <Input
-            label="Valor da entrega (R$)"
-            type="number" step="0.01" min="0"
-            defaultValue={toReais(form.deliveryFee)}
-            onChange={(e) => setForm((f) => ({ ...f, deliveryFeeInput: e.target.value }))}
-          />
-          <div className="mt-3">
-            <Input
-              label="Entrega grátis acima de (R$, opcional)"
-              type="number" step="0.01" min="0"
-              defaultValue={form.freeDeliveryAbove ? toReais(form.freeDeliveryAbove) : ''}
-              onChange={(e) => setForm((f) => ({ ...f, freeDeliveryAboveInput: e.target.value }))}
-            />
-          </div>
+        <Card onClick={() => navigate('/settings/delivery')}>
+          <h3 className="font-semibold text-sm">Taxa de entrega</h3>
+          <p className="text-xs text-gray-500 mt-1">A taxa e a área de entrega agora ficam em <b className="text-primary">Configurações → Entrega</b> (por bairro, distância ou área no mapa). Toque aqui para abrir.</p>
         </Card>
 
         <Button full onClick={handleSave} loading={update.isPending}>Salvar configurações</Button>

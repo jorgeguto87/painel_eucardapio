@@ -49,6 +49,7 @@ export default function BotConfigPage() {
     welcomeImageBase64: v?.welcomeImageBase64 || null,
     awayMessage: v?.awayMessage || '',
     openingMessage: v?.openingMessage || '',
+    isActive: v?.isActive !== false,
   })
   const isDirty = !!form && !!config && pick(form) !== pick(config)
   const confirmLeave = useUnsavedChangesGuard(isDirty)
@@ -64,6 +65,7 @@ export default function BotConfigPage() {
       welcomeImageBase64: form.welcomeImageBase64 || null,
       awayMessage:        form.awayMessage,
       openingMessage:     form.openingMessage,
+      isActive:           form.isActive !== false,
     })
   }
 
@@ -72,6 +74,28 @@ export default function BotConfigPage() {
       <TopBar title="Mensagens do bot" back onBack={() => { if (confirmLeave()) navigate(-1) }} />
 
       <form onSubmit={handleSubmit} className="page space-y-4">
+        <div className={`rounded-2xl border p-4 ${form.isActive !== false ? 'border-success/30 bg-success/5' : 'border-gray-200 bg-white'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-sm text-secondary">Robô atende os clientes</p>
+              <p className="text-xs text-gray-500 mt-0.5">{form.isActive !== false ? 'Ligado: responde no WhatsApp com o menu, o link do cardápio e o status do pedido.' : 'Desligado: o robô não responde mensagens.'}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.isActive !== false}
+              aria-label="Robô atende os clientes"
+              onClick={() => setForm((f) => ({ ...f, isActive: f.isActive === false }))}
+              className={`relative w-11 h-6 flex-shrink-0 rounded-full transition-colors ${form.isActive !== false ? 'bg-success' : 'bg-gray-300'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.isActive !== false ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-3 leading-relaxed bg-white/70 rounded-xl px-3 py-2">
+            Mesmo desligado, o WhatsApp continua enviando o <b>código de acesso</b> dos clientes, o <b>status dos pedidos</b>, as <b>mensagens dos entregadores</b> e recebendo os <b>comprovantes de Pix</b>. Por isso ele precisa estar sempre conectado.
+          </p>
+        </div>
+
         <ImageUploadField
           label="Imagem de boas-vindas (enviada no 1º contato do cliente)"
           imageBase64={form.welcomeImageBase64}

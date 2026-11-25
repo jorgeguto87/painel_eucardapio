@@ -50,3 +50,7 @@
   .label { @apply block text-sm font-medium text-secondary mb-1; }
   .page  { @apply px-4 pt-4 pb-24 max-w-lg mx-auto md:max-w-5xl md:pb-10; }
 }
+
+/* Nome das áreas de entrega no mapa (tela Entrega) */
+.leaflet-tooltip.zone-label { background: rgba(255,255,255,.92); border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.15); font-weight: 600; font-size: 11px; color: #1A1A2E; padding: 2px 6px; }
+.leaflet-tooltip.zone-label::before { display: none; }
